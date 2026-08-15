@@ -1,0 +1,12 @@
+import type { AccessTokenPayload } from "../lib/jwt.js";
+
+declare global {
+  namespace Express {
+    interface Request {
+      requestId: string;
+      auth?: AccessTokenPayload;
+    }
+  }
+}
+
+export {};
