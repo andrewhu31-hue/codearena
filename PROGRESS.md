@@ -22,6 +22,13 @@ The initial Prisma migration (`packages/database/prisma/migrations/2026081520205
 generated against that real Postgres instance, so `npm run db:migrate` is exercised, not just
 typechecked.
 
+## Cadence
+
+Originally planned as an automated daily cloud agent, but that requires connecting a GitHub App
+installation to this repo on github.com, which didn't work out. Falling back to manual check-ins:
+the next milestone is implemented in-session whenever the human says to continue — no fixed
+schedule. Repo: https://github.com/andrewhu31-hue/codearena (pushed after Milestone 1).
+
 ## Notes for the next session/day
 
 - Read `PRD.md` in full before starting a milestone.
