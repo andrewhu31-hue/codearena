@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { NavBar } from "./components/NavBar";
 
 export default function LandingPage() {
@@ -10,9 +11,16 @@ export default function LandingPage() {
           A competitive programming platform: browse problems, submit solutions, and compete in
           timed contests with live rankings.
         </p>
+        <Link
+          href="/problems"
+          className="mt-8 inline-block rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500"
+        >
+          Browse problems
+        </Link>
         <p className="mt-8 text-sm text-slate-500">
-          Problem catalog, the submission workspace, and contests arrive in later milestones.
-          Milestone 1 covers registration, login, and session management.
+          Timed contests and live leaderboards arrive in a later milestone. Submissions are
+          currently judged by a deterministic placeholder that verifies the queue/worker pipeline;
+          real Python/JavaScript/C++ execution arrives in Milestone 3.
         </p>
       </main>
     </>

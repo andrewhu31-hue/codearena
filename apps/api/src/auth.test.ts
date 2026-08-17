@@ -5,6 +5,7 @@ import { Redis } from "ioredis";
 import { prisma } from "@codearena/database";
 import { loadApiEnv } from "@codearena/config";
 import { createApp } from "./app.js";
+import { createSubmissionQueue } from "./lib/queue.js";
 
 /**
  * Integration tests against a real Postgres + Redis, as started by
@@ -19,15 +20,19 @@ const describeIfInfra = hasTestInfra ? describe : describe.skip;
 describeIfInfra("auth flow", () => {
   let app: Express;
   let redis: Redis;
+  let queueHandle: ReturnType<typeof createSubmissionQueue>;
 
   beforeAll(() => {
     const env = loadApiEnv();
     redis = new Redis(env.REDIS_URL);
-    app = createApp(env, redis);
+    queueHandle = createSubmissionQueue(env);
+    app = createApp(env, redis, queueHandle.queue);
   });
 
   afterAll(async () => {
     await redis.quit();
+    await queueHandle.queue.close();
+    await queueHandle.connection.quit();
     await prisma.$disconnect();
   });
 

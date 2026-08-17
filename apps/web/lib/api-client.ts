@@ -1,4 +1,15 @@
-import type { ApiErrorBody, AuthResponse, LoginInput, RegisterInput } from "@codearena/shared";
+import type {
+  ApiErrorBody,
+  AuthResponse,
+  CreateSubmissionInput,
+  LoginInput,
+  ProblemDetail,
+  ProblemSummary,
+  RegisterInput,
+  SubmissionDetail,
+  SubmissionListResponse,
+  SubmissionSummary,
+} from "@codearena/shared";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -50,6 +61,31 @@ export const authApi = {
 
   me: (accessToken: string) =>
     request<AuthResponse["user"]>("/api/v1/auth/me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+};
+
+export const problemsApi = {
+  list: () => request<{ problems: ProblemSummary[] }>("/api/v1/problems"),
+
+  getBySlug: (slug: string) => request<ProblemDetail>(`/api/v1/problems/${slug}`),
+};
+
+export const submissionsApi = {
+  create: (accessToken: string, input: CreateSubmissionInput) =>
+    request<SubmissionSummary>("/api/v1/submissions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(input),
+    }),
+
+  getById: (accessToken: string, id: string) =>
+    request<SubmissionDetail>(`/api/v1/submissions/${id}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+
+  listMine: (accessToken: string, page = 1) =>
+    request<SubmissionListResponse>(`/api/v1/users/me/submissions?page=${page}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     }),
 };

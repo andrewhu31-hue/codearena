@@ -1,2 +1,2 @@
-export { loadApiEnv } from "./env.js";
-export type { ApiEnv } from "./env.js";
+export { loadApiEnv, loadJudgeWorkerEnv } from "./env.js";
+export type { ApiEnv, JudgeWorkerEnv } from "./env.js";

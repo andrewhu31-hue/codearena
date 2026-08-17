@@ -40,7 +40,10 @@ export default function MePage() {
               </div>
             </dl>
             <p className="mt-8 text-sm text-slate-500">
-              Submission history and contest activity will appear here starting in Milestone 2.
+              <Link href="/submissions" className="text-indigo-400 hover:text-indigo-300">
+                View your submission history
+              </Link>
+              . Contest activity arrives in a later milestone.
             </p>
           </div>
         )}

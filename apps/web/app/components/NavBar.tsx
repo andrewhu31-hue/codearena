@@ -9,9 +9,19 @@ export function NavBar() {
   return (
     <header className="border-b border-slate-800">
       <nav className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-lg font-semibold">
-          CodeArena
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="text-lg font-semibold">
+            CodeArena
+          </Link>
+          <Link href="/problems" className="text-sm text-slate-300 hover:text-white">
+            Problems
+          </Link>
+          {user && (
+            <Link href="/submissions" className="text-sm text-slate-300 hover:text-white">
+              Submissions
+            </Link>
+          )}
+        </div>
         <div className="flex items-center gap-4 text-sm">
           {status === "loading" ? (
             <span className="text-slate-500">Loading…</span>

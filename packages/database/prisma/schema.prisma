@@ -1,10 +1,10 @@
 // CodeArena database schema.
 //
-// Milestone 1 (Foundation) implements User and RefreshToken fully.
-// The remaining models are created now as minimal stubs so that later
-// milestones extend the schema with additive migrations instead of
-// reshaping the relational graph after real data exists. They carry no
-// business logic yet.
+// Milestone 1 (Foundation) implemented User and RefreshToken fully.
+// Milestone 2 (Problems and submissions) implements Problem, TestCase, and
+// Submission/SubmissionResult fully. Contest-related models remain minimal
+// stubs so Milestone 4 can extend them with additive migrations instead of
+// reshaping the relational graph after real data exists.
 
 generator client {
   provider = "prisma-client-js"
@@ -84,12 +84,15 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-/// Stub for Milestone 2. Only fields needed for FK references exist today.
 model Problem {
   id                 String     @id @default(uuid())
   slug               String     @unique
   title              String
   description        String     @default("")
+  inputFormat        String     @default("")
+  outputFormat       String     @default("")
+  constraints        String     @default("")
+  examples           Json       @default("[]")
   difficulty         Difficulty @default(EASY)
   timeLimitMs        Int        @default(1000)
   memoryLimitMb      Int        @default(256)
@@ -104,7 +107,6 @@ model Problem {
   @@map("problems")
 }
 
-/// Stub for Milestone 2/3.
 model TestCase {
   id             String   @id @default(uuid())
   problemId      String
@@ -167,7 +169,6 @@ model ContestRegistration {
   @@map("contest_registrations")
 }
 
-/// Stub for Milestone 2/3.
 model Submission {
   id              String            @id @default(uuid())
   userId          String
@@ -196,7 +197,6 @@ model Submission {
   @@map("submissions")
 }
 
-/// Stub for Milestone 3.
 model SubmissionResult {
   id           String     @id @default(uuid())
   submissionId String

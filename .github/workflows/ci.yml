@@ -74,5 +74,8 @@ jobs:
       - name: Build api image
         run: docker build -f infrastructure/docker/api.Dockerfile -t codearena-api:ci .
 
+      - name: Build judge-worker image
+        run: docker build -f infrastructure/docker/judge-worker.Dockerfile -t codearena-judge-worker:ci .
+
       - name: Build web image
         run: docker build -f infrastructure/docker/web.Dockerfile -t codearena-web:ci .

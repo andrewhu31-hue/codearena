@@ -15,6 +15,7 @@
     "@codearena/database": "*",
     "@codearena/shared": "*",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.28.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "express": "^4.21.1",

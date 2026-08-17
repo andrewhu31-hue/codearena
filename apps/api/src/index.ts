@@ -2,11 +2,13 @@ import { loadApiEnv } from "@codearena/config";
 import { prisma } from "@codearena/database";
 import { createApp } from "./app.js";
 import { createRedisClient } from "./lib/redis.js";
+import { createSubmissionQueue } from "./lib/queue.js";
 import { logger } from "./lib/logger.js";
 
 const env = loadApiEnv();
 const redis = createRedisClient(env);
-const app = createApp(env, redis);
+const { queue: submissionQueue, connection: queueConnection } = createSubmissionQueue(env);
+const app = createApp(env, redis, submissionQueue);
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, "API listening");
@@ -23,7 +25,12 @@ async function shutdown(signal: string): Promise<void> {
     if (err) {
       logger.error({ err }, "Error closing HTTP server");
     }
-    await Promise.allSettled([prisma.$disconnect(), redis.quit()]);
+    await Promise.allSettled([
+      prisma.$disconnect(),
+      redis.quit(),
+      submissionQueue.close(),
+      queueConnection.quit(),
+    ]);
     process.exit(err ? 1 : 0);
   });
 
