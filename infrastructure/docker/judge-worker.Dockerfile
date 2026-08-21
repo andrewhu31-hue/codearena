@@ -27,11 +27,19 @@ RUN npm run build:packages \
 
 FROM base AS runtime
 ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 codearena && adduser --system --uid 1001 --gid 1001 codearena
+# The Docker CLI (not a daemon) — this worker never runs a container of its
+# own, it shells out to the *host's* daemon via the mounted socket below to
+# launch sandboxed sibling containers (Docker-outside-of-Docker).
+RUN apt-get update -qq && apt-get install -y --no-install-recommends docker.io \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /repo/node_modules node_modules
 COPY --from=build /repo/package.json package.json
 COPY --from=build /repo/packages packages
 COPY --from=build /repo/apps/judge-worker/dist apps/judge-worker/dist
 COPY --from=build /repo/apps/judge-worker/package.json apps/judge-worker/package.json
-USER codearena
+# Runs as root (unlike api/web): reading /var/run/docker.sock requires it
+# in practice, since its group ownership varies by host. This is a
+# deliberate, different trust boundary from the untrusted submission
+# containers this process launches, which never get socket access or run
+# as root — see docs/judge-security.md.
 CMD ["node", "apps/judge-worker/dist/index.js"]

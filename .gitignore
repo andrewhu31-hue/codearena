@@ -9,3 +9,4 @@ coverage/
 .DS_Store
 packages/database/generated/
 *.tsbuildinfo
+.judge-workspaces/

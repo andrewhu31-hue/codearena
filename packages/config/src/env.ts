@@ -49,6 +49,11 @@ const judgeWorkerEnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  // Only needed when judge-worker itself runs in a container talking to the
+  // host's Docker daemon (Docker-outside-of-Docker) — see
+  // docs/judge-security.md. Unset in normal host-machine/CI development.
+  JUDGE_WORKSPACE_DIR: z.string().optional(),
+  JUDGE_WORKSPACE_HOST_DIR: z.string().optional(),
 });
 
 export type JudgeWorkerEnv = z.infer<typeof judgeWorkerEnvSchema>;

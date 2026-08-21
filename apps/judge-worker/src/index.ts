@@ -1,9 +1,22 @@
 import { loadJudgeWorkerEnv } from "@codearena/config";
 import { prisma } from "@codearena/database";
 import { createSubmissionWorker } from "./worker.js";
+import { isDockerAvailable } from "./execution/dockerAvailable.js";
 import { logger } from "./lib/logger.js";
 
 const env = loadJudgeWorkerEnv();
+
+// Fail fast and loud rather than accepting jobs it can never actually
+// judge: every submission is evaluated inside a Docker sandbox (PRD §12),
+// so a worker with no Docker daemon is not just degraded, it's useless.
+if (!isDockerAvailable()) {
+  logger.fatal(
+    "Docker is not available (`docker info` failed). The judge worker cannot evaluate " +
+      "submissions without it — see docs/judge-security.md.",
+  );
+  process.exit(1);
+}
+
 const { worker, connection } = createSubmissionWorker(env);
 
 logger.info({ concurrency: env.WORKER_CONCURRENCY }, "Judge worker listening");

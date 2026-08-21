@@ -4,10 +4,9 @@ A full-stack competitive programming platform: register, browse problems, submit
 compete in timed contests, and watch live rankings. See [`PRD.md`](./PRD.md) for the full product
 requirements and [`PROGRESS.md`](./PROGRESS.md) for the milestone build plan.
 
-**Status: Milestone 2 — Problems and submissions.** Authentication, the problem catalog/workspace,
-and the submission pipeline (API → BullMQ → worker → verdict → history) are in place. Real
-per-language code execution and contests arrive in later milestones (see
-[`PROGRESS.md`](./PROGRESS.md)).
+**Status: Milestone 3 — Judge workers.** Authentication, the problem catalog/workspace, the
+submission pipeline, and real Docker-sandboxed Python/JavaScript/C++ execution are in place.
+Contests arrive in a later milestone (see [`PROGRESS.md`](./PROGRESS.md)).
 
 ## Stack
 
@@ -31,6 +30,8 @@ codearena/
     config/               Environment-variable validation
   infrastructure/
     docker/               Dockerfiles for web, api, and judge-worker
+  docs/
+    judge-security.md     Sandbox model, threat model, and known limitations
   docker-compose.yml
 ```
 
@@ -46,6 +47,10 @@ cp .env.example .env          # adjust secrets for anything beyond local dev
 docker compose up --build     # starts postgres, redis, migrate, api, judge-worker, web
 docker compose run --rm seed  # one-off: seeds an admin, two contestants, six problems, one contest
 ```
+
+Run this from the repo root — `judge-worker` mounts the host's Docker socket and a
+`./.judge-workspaces` directory to sandbox submissions (see
+[`docs/judge-security.md`](./docs/judge-security.md)), and both assume `$PWD` is the repo root.
 
 - Web: http://localhost:3000
 - API: http://localhost:4000 (health: `/health`, readiness: `/ready`)
@@ -76,9 +81,12 @@ npm run db:migrate
 npm run db:seed
 
 npm run dev:api     # http://localhost:4000
-npm run dev:worker  # judges submissions in the background
+npm run dev:worker  # judges submissions in the background — needs Docker Desktop/Engine running
 npm run dev:web     # http://localhost:3000
 ```
+
+Run this way (not via `docker compose up judge-worker`), the worker talks to your local Docker
+daemon directly — no Docker-outside-of-Docker path translation needed, unlike the Compose service.
 
 ## Problems and submissions
 
@@ -93,15 +101,20 @@ npm run dev:web     # http://localhost:3000
 
 ## Judging
 
-`apps/judge-worker` consumes the `submissions` BullMQ queue. Per PRD §12, no submission is ever
-executed outside a Docker sandbox — and that sandbox doesn't exist until Milestone 3 — so the
-current worker uses a **documented placeholder evaluator**
-(`apps/judge-worker/src/mockEvaluator.ts`) that does not run submitted code at all. It exists to
-exercise the full pipeline (queue → `RUNNING` → verdict → `SubmissionResult` rows → history) end
-to end before real execution lands. Submissions default to `ACCEPTED`; a source can opt into a
-different verdict for demos/tests via a first-line directive, e.g.
-`// CODEARENA_VERDICT: WRONG_ANSWER`. `runtimeMs`/`memoryKb` stay `null` until Milestone 3 actually
-measures them.
+`apps/judge-worker` consumes the `submissions` BullMQ queue and evaluates each one for real, inside
+Docker sandboxes — no submission is ever executed inside the API or worker process (PRD §12). For
+each test case: compile if the language needs it (C++), run the compiled binary or interpreter
+against that test's input inside an isolated, resource-limited container, and compare its stdout
+against the expected output. Stops at the first failing test, like most online judges, rather than
+always running every one. See [`docs/judge-security.md`](./docs/judge-security.md) for the full
+sandbox model (isolation flags, cleanup, Docker-outside-of-Docker when the worker itself runs in a
+container) and its documented limitations (approximate memory sampling, unpinned image tags, etc).
+
+`apps/judge-worker/src/execution/` holds the engine: `languages.ts` (per-language image/compile/run
+commands), `dockerArgs.ts`/`dockerProcess.ts` (sandboxed `docker run` invocation, timeouts, output
+cap, OOM detection), `outputCompare.ts` (whitespace-tolerant comparison), and `evaluate.ts`
+(orchestration). `runtimeMs` is a host-side wall-clock measurement; `memoryKb` is a best-effort peak
+sampled via `docker stats` and left `null` if no sample was captured, rather than fabricated.
 
 Queue/worker behavior (PRD §11):
 
@@ -180,14 +193,23 @@ The API and judge worker both refuse to start if a required variable is missing 
   unsupported-language rejection; paginated history). They no-op (`describe.skip`) if
   `DATABASE_URL`/`REDIS_URL` aren't set. Because they share one real database, `vitest.config.ts`
   sets `fileParallelism: false` so files don't reset each other's fixtures mid-run.
-- `apps/judge-worker/src/mockEvaluator.test.ts` — pure unit tests for the placeholder judge's
-  verdict logic, no infra required.
+- `apps/judge-worker/src/execution/outputCompare.test.ts`, `dockerArgs.test.ts`,
+  `memoryUsage.test.ts` — pure unit tests (output normalization, the exact `docker run` flags built
+  for every sandbox invocation, `docker stats` output parsing). No infra required.
+- `apps/judge-worker/src/execution/evaluate.docker.test.ts` — runs the real execution engine
+  against a live Docker daemon: correct solutions in all three languages, a C++ compilation error,
+  a wrong answer, a non-zero exit, and a submission that never terminates (time limit). Skips
+  itself (`describe.skip`) if `docker info` fails.
 - `apps/judge-worker/src/worker.test.ts` — runs the real BullMQ worker end to end against
-  Postgres/Redis: enqueues a job the way the API would and asserts a persisted verdict and
-  `SubmissionResult` rows. This is PRD §16's deterministic lifecycle test (register → submit a
-  correct solution → judged → `ACCEPTED`), exercised at the worker/queue layer since Milestone 2
-  doesn't yet have a leaderboard to extend it to.
-- Run integration suites locally with `docker compose up -d postgres redis` then `npm run test`.
+  Postgres/Redis _and_ a real Docker execution: enqueues a job the way the API would and asserts a
+  persisted verdict and `SubmissionResult` rows. This is PRD §16's deterministic lifecycle test
+  (register → submit a correct solution → judged → `ACCEPTED`), exercised at the worker/queue layer
+  since there's no leaderboard yet to extend it to. Needs Postgres, Redis, _and_ Docker; skips
+  itself if any are missing.
+- Run integration suites locally with `docker compose up -d postgres redis` and Docker running,
+  then `npm run test`. CI pre-pulls the three judge runtime images
+  (`python:3.12-slim`/`node:20-slim`/`gcc:13`) before testing so the Docker-dependent suites don't
+  burn their timeout on a cold pull.
 
 ## CI
 
@@ -198,10 +220,11 @@ credentials.
 
 ## Known limitations at this milestone
 
-- Submissions are judged by a documented placeholder (see [Judging](#judging)), not real Python/
-  JavaScript/C++ execution — that's Milestone 3.
 - No contests, live leaderboard, or WebSocket updates yet; the workspace polls submission status
   over HTTP instead. See `PROGRESS.md` for the day-by-day plan.
 - Problem administration has no dedicated UI yet — only the REST endpoints (`POST`/`PATCH
 /problems`, admin-only).
+- Docker is not a complete sandbox, memory measurement is best-effort, and image tags aren't
+  pinned to digests — see [`docs/judge-security.md`](./docs/judge-security.md)'s limitations
+  section for the full list and reasoning.
 - No load tests or benchmark scripts yet (Milestone 5).

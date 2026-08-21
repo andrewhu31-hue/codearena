@@ -18,9 +18,8 @@ export default function LandingPage() {
           Browse problems
         </Link>
         <p className="mt-8 text-sm text-slate-500">
-          Timed contests and live leaderboards arrive in a later milestone. Submissions are
-          currently judged by a deterministic placeholder that verifies the queue/worker pipeline;
-          real Python/JavaScript/C++ execution arrives in Milestone 3.
+          Submissions are judged by real Python/JavaScript/C++ execution inside isolated Docker
+          sandboxes. Timed contests and a live leaderboard arrive in a later milestone.
         </p>
       </main>
     </>

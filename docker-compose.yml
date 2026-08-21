@@ -88,6 +88,16 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      # Docker-outside-of-Docker: this worker asks the *host* daemon (via
+      # the mounted socket) to mount submission workspaces into sandbox
+      # containers, so the host needs the host-side path, not this
+      # container's own view of it. Requires running `docker compose` from
+      # the repo root, so $PWD here is the repo root. See docs/judge-security.md.
+      JUDGE_WORKSPACE_DIR: /judge-workspaces
+      JUDGE_WORKSPACE_HOST_DIR: ${PWD}/.judge-workspaces
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.judge-workspaces:/judge-workspaces
     depends_on:
       postgres:
         condition: service_healthy

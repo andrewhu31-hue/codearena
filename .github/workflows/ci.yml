@@ -59,6 +59,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Pull judge runtime images
+        # Pre-pulled so the judge-worker's Docker-execution tests (which
+        # otherwise skip themselves when Docker isn't available) don't spend
+        # their per-test timeout waiting on a cold pull. GitHub-hosted
+        # runners always have a Docker daemon available.
+        run: |
+          docker pull python:3.12-slim
+          docker pull node:20-slim
+          docker pull gcc:13
+
       - name: Test
         run: npm run test
 

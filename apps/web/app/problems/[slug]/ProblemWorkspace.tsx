@@ -214,6 +214,23 @@ export function ProblemWorkspace({ slug }: { slug: string }) {
                         Tests passed: {submissionQuery.data.testsPassed}/
                         {submissionQuery.data.testsTotal}
                       </p>
+                      {(submissionQuery.data.runtimeMs !== null ||
+                        submissionQuery.data.memoryKb !== null) && (
+                        <p className="mt-1 text-sm text-slate-500">
+                          {submissionQuery.data.runtimeMs !== null &&
+                            `${submissionQuery.data.runtimeMs}ms`}
+                          {submissionQuery.data.runtimeMs !== null &&
+                            submissionQuery.data.memoryKb !== null &&
+                            " · "}
+                          {submissionQuery.data.memoryKb !== null &&
+                            `${Math.round(submissionQuery.data.memoryKb / 1024)}MB`}
+                        </p>
+                      )}
+                      {submissionQuery.data.compilerOutput && (
+                        <pre className="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs text-rose-300">
+                          {submissionQuery.data.compilerOutput}
+                        </pre>
+                      )}
                     </>
                   )}
                 </div>
