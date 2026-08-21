@@ -1,7 +1,10 @@
 import type {
   ApiErrorBody,
   AuthResponse,
+  ContestDetail,
+  ContestSummary,
   CreateSubmissionInput,
+  LeaderboardResponse,
   LoginInput,
   ProblemDetail,
   ProblemSummary,
@@ -88,4 +91,27 @@ export const submissionsApi = {
     request<SubmissionListResponse>(`/api/v1/users/me/submissions?page=${page}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     }),
+};
+
+function authHeaders(accessToken: string | null): HeadersInit | undefined {
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
+}
+
+export const contestsApi = {
+  list: (accessToken: string | null) =>
+    request<{ contests: ContestSummary[] }>("/api/v1/contests", {
+      headers: authHeaders(accessToken),
+    }),
+
+  getById: (accessToken: string | null, id: string) =>
+    request<ContestDetail>(`/api/v1/contests/${id}`, { headers: authHeaders(accessToken) }),
+
+  register: (accessToken: string, id: string) =>
+    request<void>(`/api/v1/contests/${id}/register`, {
+      method: "POST",
+      headers: authHeaders(accessToken),
+    }),
+
+  getLeaderboard: (id: string) =>
+    request<LeaderboardResponse>(`/api/v1/contests/${id}/leaderboard`),
 };

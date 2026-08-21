@@ -12,6 +12,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
 import { createProblemRouter } from "./routes/problem.routes.js";
 import { createSubmissionRouter, createUserSubmissionsRouter } from "./routes/submission.routes.js";
+import { createContestRouter } from "./routes/contest.routes.js";
 import { createGeneralRateLimiter } from "./middleware/rateLimit.js";
 import { logger } from "./lib/logger.js";
 
@@ -49,6 +50,7 @@ export function createApp(env: ApiEnv, redis: Redis, submissionQueue: Queue): Ex
   app.use("/api/v1/problems", createProblemRouter(env, redis));
   app.use("/api/v1/submissions", createSubmissionRouter(env, redis, submissionQueue));
   app.use("/api/v1/users", createUserSubmissionsRouter(env, submissionQueue));
+  app.use("/api/v1/contests", createContestRouter(env, redis));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

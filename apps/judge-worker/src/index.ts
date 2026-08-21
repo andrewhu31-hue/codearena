@@ -17,7 +17,7 @@ if (!isDockerAvailable()) {
   process.exit(1);
 }
 
-const { worker, connection } = createSubmissionWorker(env);
+const { worker, connection, redisClient } = createSubmissionWorker(env);
 
 logger.info({ concurrency: env.WORKER_CONCURRENCY }, "Judge worker listening");
 
@@ -31,7 +31,7 @@ async function shutdown(signal: string): Promise<void> {
   // Waits for in-flight jobs to finish before closing, so a deploy or
   // restart doesn't abandon a submission mid-judgement.
   await Promise.allSettled([worker.close(), prisma.$disconnect()]);
-  await connection.quit();
+  await Promise.allSettled([connection.quit(), redisClient.quit()]);
   process.exit(0);
 }
 

@@ -16,6 +16,9 @@ export function NavBar() {
           <Link href="/problems" className="text-sm text-slate-300 hover:text-white">
             Problems
           </Link>
+          <Link href="/contests" className="text-sm text-slate-300 hover:text-white">
+            Contests
+          </Link>
           {user && (
             <Link href="/submissions" className="text-sm text-slate-300 hover:text-white">
               Submissions

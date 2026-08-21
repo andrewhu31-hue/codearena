@@ -34,6 +34,18 @@ async function waitForTerminalStatus(submissionId: string, timeoutMs = 30_000) {
   }
 }
 
+async function waitForContestScore(contestId: string, userId: string, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const score = await prisma.contestScore.findUnique({
+      where: { contestId_userId: { contestId, userId } },
+    });
+    if (score) return score;
+    if (Date.now() > deadline) throw new Error("Timed out waiting for contest score");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 async function seedEchoProblem() {
   // A trivial "print exactly what you're given" problem: any correct
   // solution echoes stdin to stdout, so verdicts here reflect real output
@@ -77,8 +89,12 @@ describeIfReady("submission lifecycle", () => {
   });
 
   afterEach(async () => {
+    await prisma.contestScore.deleteMany();
+    await prisma.contestRegistration.deleteMany();
+    await prisma.contestProblem.deleteMany();
     await prisma.submissionResult.deleteMany();
     await prisma.submission.deleteMany();
+    await prisma.contest.deleteMany();
     await prisma.testCase.deleteMany();
     await prisma.problem.deleteMany();
     await prisma.user.deleteMany();
@@ -88,7 +104,7 @@ describeIfReady("submission lifecycle", () => {
     await queue.close();
     await queueConnection.quit();
     await workerHandle.worker.close();
-    await workerHandle.connection.quit();
+    await Promise.allSettled([workerHandle.connection.quit(), workerHandle.redisClient.quit()]);
     await prisma.$disconnect();
   });
 
@@ -186,4 +202,52 @@ describeIfReady("submission lifecycle", () => {
     });
     expect(results).toHaveLength(0);
   });
+
+  it("updates the contest score and leaderboard cache after judging a contest submission", async () => {
+    const { problem, user } = await seedEchoProblem();
+    const contest = await prisma.contest.create({
+      data: {
+        name: "Live Contest",
+        startTime: new Date(Date.now() - 60_000),
+        endTime: new Date(Date.now() + 3_600_000),
+        visibility: "PUBLIC",
+        contestProblems: { create: [{ problemId: problem.id, points: 150 }] },
+      },
+    });
+    await prisma.contestRegistration.create({ data: { contestId: contest.id, userId: user.id } });
+
+    const submission = await prisma.submission.create({
+      data: {
+        userId: user.id,
+        problemId: problem.id,
+        contestId: contest.id,
+        language: "PYTHON",
+        sourceCode: "import sys\nsys.stdout.write(sys.stdin.read())\n",
+        testsTotal: problem.testCases.length,
+      },
+    });
+
+    await queue.add(
+      "evaluate",
+      { submissionId: submission.id },
+      { jobId: submission.id, attempts: 1 },
+    );
+    await waitForTerminalStatus(submission.id);
+
+    // recomputeContestScore runs just after the submission is marked
+    // COMPLETED, in the same job — poll rather than assume it's already
+    // landed the instant the submission's own status flips.
+    const score = await waitForContestScore(contest.id, user.id);
+    expect(score.score).toBe(150);
+    expect(score.solvedCount).toBe(1);
+
+    // The Redis cache update is a further await after the ContestScore
+    // upsert in the same function, so give it the same grace.
+    let cached: string[] = [];
+    for (let attempt = 0; attempt < 20 && cached.length === 0; attempt++) {
+      cached = await workerHandle.redisClient.zrevrange(`leaderboard:${contest.id}`, 0, -1);
+      if (cached.length === 0) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(cached).toEqual([user.id]);
+  }, 60_000);
 });

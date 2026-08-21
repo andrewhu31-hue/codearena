@@ -3,3 +3,7 @@ export * from "./errors.js";
 export * from "./problems.js";
 export * from "./submissions.js";
 export * from "./queue.js";
+export * from "./contests.js";
+export * from "./leaderboard.js";
+export * from "./events.js";
+export * from "./scoring.js";

@@ -7,7 +7,7 @@ Five-day build plan, one PRD milestone implemented and committed per day.
 | 1   | Milestone 1 — Foundation (monorepo, Docker Compose, Postgres, Redis, auth, migrations, seed data, basic UI)    | done    |
 | 2   | Milestone 2 — Problems and submissions (catalog/workspace, Monaco, submission API/history, BullMQ, mock judge) | done    |
 | 3   | Milestone 3 — Judge workers (Python/JS/C++ execution, Docker isolation, resource limits, cleanup/retries)      | done    |
-| 4   | Milestone 4 — Contests (creation, registration, timing, scoring, Redis leaderboard, Socket.IO)                 | pending |
+| 4   | Milestone 4 — Contests (creation, registration, timing, scoring, Redis leaderboard, Socket.IO)                 | done    |
 | 5   | Milestone 5 — Quality and measurement (tests, logs, health checks, k6, cache benchmark, CI, docs)              | pending |
 
 ## Day 1 verification (2026-08-15)
@@ -100,6 +100,34 @@ as an untested assumption:
 - CI (`.github/workflows/ci.yml`) now pre-pulls the three judge runtime images before running tests
   and builds the `judge-worker` image alongside `api`/`web`; GitHub-hosted runners have Docker
   available by default, so the Docker-dependent suites should run for real there too, not skip.
+
+## Day 4 verification (2026-08-21)
+
+Same session as Day 3, continuing with real Postgres/Redis/Docker already available.
+
+- `npm run format`, `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` all
+  pass across all five workspaces (`packages/shared` gained its own test suite this milestone —
+  `scoring.test.ts` — so it's now five, not four).
+- 71 tests pass total: the scoring algorithm (`packages/shared/src/scoring.ts`) has 8 pure unit
+  tests covering immediate-accept, penalty accumulation, compile/internal-error exclusion,
+  resubmission-after-accept, multi-problem sums, and order-independence; `apps/api/src/
+contests.test.ts` adds 11 integration tests for visibility rules, admin-only writes,
+  registration, server-side timing/registration/problem-membership enforcement on contest
+  submissions, and the leaderboard read path (including the Postgres-rebuild-on-empty-cache case);
+  `apps/judge-worker/src/worker.test.ts` gained one real-Docker test asserting `ContestScore` and
+  the Redis leaderboard cache both update after a contest submission is judged.
+- Manually verified the full real-time pipeline end to end, which no automated test exercises: ran
+  the API and judge worker together, used a real `socket.io-client` instance to connect,
+  authenticate, and join a contest's room, then submitted a genuine C++ solution to a live contest
+  from a separate registered account. The socket received a live `submission:update` (`COMPLETED`/
+  `ACCEPTED`) and a `leaderboard:update` event within seconds of the real Docker judging finishing
+  — not simulated, an actual WebSocket message delivered by the running server. `GET /contests/:id/
+leaderboard` immediately reflected the correct score (150, matching the contest problem's
+  points), solved count, and penalty (~1 minute, matching real elapsed time since contest start).
+- One thing this session did **not** verify: the Docker-outside-of-Docker wiring in
+  `docker-compose.yml` still hasn't been exercised via an actual `docker compose up` (same caveat
+  as Day 3) — all verification above used `npm run dev:worker`/`dev:api` talking to Docker
+  directly on the host, not the containerized judge-worker service.
 
 ## Cadence
 

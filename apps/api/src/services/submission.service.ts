@@ -59,24 +59,55 @@ function toDetail(
 
 const PROBLEM_SELECT = { problem: { select: { slug: true, title: true } } } as const;
 
+/**
+ * The server is the sole authority on contest timing (PRD §14: "client
+ * timers are display-only") — a submission outside the contest window, to
+ * a problem not in the contest, or from an unregistered user is rejected
+ * here regardless of what the client believes.
+ */
+async function validateContestSubmission(
+  contestId: string,
+  problemId: string,
+  userId: string,
+): Promise<void> {
+  const contest = await prisma.contest.findUnique({ where: { id: contestId } });
+  if (!contest) throw AppError.notFound("Contest not found");
+
+  const now = new Date();
+  if (now < contest.startTime || now > contest.endTime) {
+    throw AppError.validation("Contest is not currently active");
+  }
+
+  const registration = await prisma.contestRegistration.findUnique({
+    where: { contestId_userId: { contestId, userId } },
+  });
+  if (!registration) throw AppError.validation("Register for the contest before submitting");
+
+  const contestProblem = await prisma.contestProblem.findUnique({
+    where: { contestId_problemId: { contestId, problemId } },
+  });
+  if (!contestProblem) throw AppError.validation("This problem is not part of the contest");
+}
+
 export async function createSubmission(
   queue: Queue,
   userId: string,
   input: CreateSubmissionInput,
 ): Promise<SubmissionSummary> {
-  if (input.contestId) {
-    throw AppError.validation("Contest submissions are not supported yet");
-  }
-
   const problem = await problemService.getProblemForSubmission(input.problemId);
   if (!problem.supportedLanguages.includes(input.language)) {
     throw AppError.validation(`${input.language} is not supported for this problem`);
+  }
+
+  if (input.contestId) {
+    await validateContestSubmission(input.contestId, input.problemId, userId);
   }
 
   const submission = await prisma.submission.create({
     data: {
       userId,
       problemId: input.problemId,
+      contestId: input.contestId,
       language: input.language,
       sourceCode: input.sourceCode,
       testsTotal: problem._count.testCases,

@@ -4,16 +4,18 @@ A full-stack competitive programming platform: register, browse problems, submit
 compete in timed contests, and watch live rankings. See [`PRD.md`](./PRD.md) for the full product
 requirements and [`PROGRESS.md`](./PROGRESS.md) for the milestone build plan.
 
-**Status: Milestone 3 — Judge workers.** Authentication, the problem catalog/workspace, the
-submission pipeline, and real Docker-sandboxed Python/JavaScript/C++ execution are in place.
-Contests arrive in a later milestone (see [`PROGRESS.md`](./PROGRESS.md)).
+**Status: Milestone 4 — Contests.** Authentication, the problem catalog/workspace, the submission
+pipeline, real Docker-sandboxed Python/JavaScript/C++ execution, and timed contests with a
+Redis-backed live leaderboard and Socket.IO push are all in place. Quality/measurement work (load
+tests, cache benchmark, expanded docs) is the last milestone (see [`PROGRESS.md`](./PROGRESS.md)).
 
 ## Stack
 
-- **Web**: Next.js (App Router), React, TypeScript, Tailwind CSS, TanStack Query, Monaco Editor
-- **API**: Node.js, Express, TypeScript, Zod, Prisma, BullMQ
+- **Web**: Next.js (App Router), React, TypeScript, Tailwind CSS, TanStack Query, Monaco Editor,
+  Socket.IO client
+- **API**: Node.js, Express, TypeScript, Zod, Prisma, BullMQ, Socket.IO
 - **Judge worker**: Node.js, TypeScript, BullMQ consumer (see [Judging](#judging) below)
-- **Data**: PostgreSQL (source of truth), Redis (queue, caching, rate limiting)
+- **Data**: PostgreSQL (source of truth), Redis (queue, caching, rate limiting, leaderboard, pub/sub)
 - **Infra**: Docker Compose, GitHub Actions
 
 ## Repository structure
@@ -129,6 +131,52 @@ Queue/worker behavior (PRD §11):
 - **Concurrency**: configurable via `WORKER_CONCURRENCY`; scale worker instances with
   `docker compose up --scale judge-worker=4`.
 
+## Contests, scoring, and the leaderboard
+
+- `GET /api/v1/contests` / `GET /api/v1/contests/:id` are public for `PUBLIC` contests; `PRIVATE`
+  ones are only visible to admins and registered users (an unregistered non-admin gets the same
+  404 as a nonexistent contest, so private contests aren't discoverable by ID-guessing).
+- `POST /api/v1/contests` / `PATCH /api/v1/contests/:id` (admin-only) set name/description/
+  start-end time/visibility and the attached problems with their points, all in one call.
+- `POST /api/v1/contests/:id/register` registers the caller (`409` on a duplicate).
+- **Timing is enforced server-side, never trusted from the client** (PRD §14): `POST /submissions`
+  with a `contestId` is rejected with `400` unless the current server time is inside
+  `[startTime, endTime]`, the caller is registered, and the problem is actually part of that
+  contest — regardless of what any client-side countdown displays.
+- **Scoring** (`packages/shared/src/scoring.ts`, unit-tested independent of any infra) is
+  ICPC-style: only a problem's first `ACCEPTED` submission counts; each wrong attempt before it
+  (excluding compile/internal errors) adds a fixed penalty
+  (`PENALTY_MINUTES_PER_WRONG_ATTEMPT`, 20 minutes) on top of the minutes elapsed since contest
+  start. The same function computes both the score judge-worker persists and the per-problem
+  breakdown the leaderboard displays, so they can't drift out of sync.
+- **Leaderboard** (`GET /api/v1/contests/:id/leaderboard`): ranking order comes from a Redis
+  sorted set (`leaderboard:<contestId>`) judge-worker updates after every judged contest
+  submission; row detail (score, solved count, penalty, per-problem breakdown) comes from
+  Postgres, which stays authoritative. If the Redis key is empty (nothing scored yet, or the
+  cache was evicted/lost), the API rebuilds it from `ContestScore` on the spot and re-reads —
+  PRD §13's "missing Redis data must be rebuildable from PostgreSQL." If Redis is unreachable
+  entirely, it falls back to ranking directly from Postgres.
+
+## Real-time updates (Socket.IO)
+
+`apps/api/src/lib/realtime.ts` runs a Socket.IO server alongside the REST API. Connections require
+a valid access token in the handshake (`auth: { token }`); "Users may join only authorized rooms"
+(PRD §8) is enforced per room:
+
+- `submission:<id>` — only the submission's owner or an admin can join; receives `submission:update`
+  (status/verdict/tests-passed) as the worker judges it.
+- `contest:<id>` — for a `PRIVATE` contest, only a registered user or an admin can join; receives
+  `leaderboard:update` whenever anyone's score in that contest changes.
+
+judge-worker has no Socket.IO server of its own (it isn't an HTTP service), so it publishes
+structured events to a plain Redis pub/sub channel (`REALTIME_CHANNEL`,
+`apps/judge-worker/src/lib/realtimePublisher.ts`); every API instance subscribes and re-emits
+locally. The API's own Socket.IO server also uses `@socket.io/redis-adapter`, so `io.to(room).emit`
+reaches clients connected to _any_ horizontally-scaled API replica, not just the one that received
+the pub/sub message. Every page using this treats it as an enhancement, not a dependency: the
+workspace and leaderboard pages poll over REST regardless (3s/10s), and a push just triggers an
+earlier refetch — a dropped or never-established socket degrades to "slightly slower," not broken.
+
 ## Caching and rate limiting
 
 - `GET /problems` and `GET /problems/:slug` are cached in Redis (`PROBLEM_CACHE_TTL_SECONDS`,
@@ -202,10 +250,17 @@ The API and judge worker both refuse to start if a required variable is missing 
   itself (`describe.skip`) if `docker info` fails.
 - `apps/judge-worker/src/worker.test.ts` — runs the real BullMQ worker end to end against
   Postgres/Redis _and_ a real Docker execution: enqueues a job the way the API would and asserts a
-  persisted verdict and `SubmissionResult` rows. This is PRD §16's deterministic lifecycle test
-  (register → submit a correct solution → judged → `ACCEPTED`), exercised at the worker/queue layer
-  since there's no leaderboard yet to extend it to. Needs Postgres, Redis, _and_ Docker; skips
-  itself if any are missing.
+  persisted verdict and `SubmissionResult` rows (PRD §16's deterministic lifecycle test: register →
+  submit a correct solution → judged → `ACCEPTED`), plus a contest-submission case asserting the
+  `ContestScore` row and the Redis leaderboard cache are both updated after judging. Needs Postgres,
+  Redis, _and_ Docker; skips itself if any are missing.
+- `packages/shared/src/scoring.test.ts` — pure unit tests for the ICPC-style scoring algorithm
+  (immediate accept, penalty accumulation, compile/internal errors excluded from penalty,
+  resubmissions after acceptance ignored, order-independence/idempotency). No infra required.
+- `apps/api/src/contests.test.ts` — integration tests for contest visibility (public vs. private),
+  admin-only create, registration and duplicate rejection, server-side timing/registration/
+  problem-membership enforcement on contest submissions, and the leaderboard read path including
+  the Postgres rebuild-on-empty-cache case.
 - Run integration suites locally with `docker compose up -d postgres redis` and Docker running,
   then `npm run test`. CI pre-pulls the three judge runtime images
   (`python:3.12-slim`/`node:20-slim`/`gcc:13`) before testing so the Docker-dependent suites don't
@@ -220,10 +275,13 @@ credentials.
 
 ## Known limitations at this milestone
 
-- No contests, live leaderboard, or WebSocket updates yet; the workspace polls submission status
-  over HTTP instead. See `PROGRESS.md` for the day-by-day plan.
-- Problem administration has no dedicated UI yet — only the REST endpoints (`POST`/`PATCH
-/problems`, admin-only).
+- Problem and contest administration have no dedicated UI yet — only the REST endpoints
+  (`POST`/`PATCH /problems`, `/contests`, admin-only).
+- Contest problem statements aren't hidden before the contest starts (only submitting to them is
+  time-gated) — anyone can navigate to a contest problem's slug via the public catalog ahead of
+  time. No standings freeze near the end, either; the leaderboard stays live throughout.
+- Socket.IO requires a logged-in user; an anonymous visitor watching a public contest's leaderboard
+  falls back to the 10s REST poll instead of instant push.
 - Docker is not a complete sandbox, memory measurement is best-effort, and image tags aren't
   pinned to digests — see [`docs/judge-security.md`](./docs/judge-security.md)'s limitations
   section for the full list and reasoning.

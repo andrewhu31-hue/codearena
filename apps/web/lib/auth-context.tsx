@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthUser, LoginInput, RegisterInput } from "@codearena/shared";
 import { authApi } from "./api-client";
+import { disconnectSocket } from "./socket-client";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -51,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await authApi.logout();
+    disconnectSocket();
     setUser(null);
     setAccessToken(null);
     setStatus("unauthenticated");

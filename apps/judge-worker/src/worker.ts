@@ -4,6 +4,9 @@ import { prisma } from "@codearena/database";
 import type { JudgeWorkerEnv } from "@codearena/config";
 import { SUBMISSION_QUEUE_NAME, type SubmissionJobData } from "@codearena/shared";
 import { evaluateSubmission } from "./execution/evaluate.js";
+import { recomputeContestScore } from "./contestScoring.js";
+import { publishSubmissionUpdate } from "./lib/realtimePublisher.js";
+import { createRedisClient } from "./lib/redis.js";
 import { logger } from "./lib/logger.js";
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED"]);
@@ -14,9 +17,14 @@ const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED"]);
 // worker hanging, not the thing enforcing per-test limits.
 const JOB_TIMEOUT_MS = 120_000;
 
+interface ProcessJobDeps {
+  env: Pick<JudgeWorkerEnv, "JUDGE_WORKSPACE_DIR" | "JUDGE_WORKSPACE_HOST_DIR">;
+  redisClient: Redis;
+}
+
 export async function processSubmissionJob(
   submissionId: string,
-  env: Pick<JudgeWorkerEnv, "JUDGE_WORKSPACE_DIR" | "JUDGE_WORKSPACE_HOST_DIR">,
+  { env, redisClient }: ProcessJobDeps,
 ): Promise<void> {
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
@@ -38,6 +46,14 @@ export async function processSubmissionJob(
   }
 
   await prisma.submission.update({ where: { id: submissionId }, data: { status: "RUNNING" } });
+  await publishSubmissionUpdate(redisClient, {
+    submissionId,
+    userId: submission.userId,
+    status: "RUNNING",
+    verdict: null,
+    testsPassed: 0,
+    testsTotal: submission.testsTotal,
+  });
 
   const { verdict, testResults, compilerOutput, runtimeMs, memoryKb } = await evaluateSubmission({
     submissionId,
@@ -76,20 +92,52 @@ export async function processSubmissionJob(
     }),
   ]);
 
+  await publishSubmissionUpdate(redisClient, {
+    submissionId,
+    userId: submission.userId,
+    status: "COMPLETED",
+    verdict,
+    testsPassed,
+    testsTotal: submission.testsTotal,
+  });
+
+  if (submission.contestId) {
+    await recomputeContestScore(redisClient, submission.contestId, submission.userId);
+  }
+
   logger.info({ submissionId, verdict, testsPassed, testsTotal: submission.testsTotal }, "Judged");
 }
 
-async function recordFinalFailure(job: Job<SubmissionJobData> | undefined): Promise<void> {
+async function recordFinalFailure(
+  job: Job<SubmissionJobData> | undefined,
+  redisClient: Redis,
+): Promise<void> {
   if (!job) return;
   const maxAttempts = job.opts.attempts ?? 1;
   if (job.attemptsMade < maxAttempts) return; // more retries remain
 
   const { submissionId } = job.data;
   try {
-    await prisma.submission.updateMany({
+    const { count } = await prisma.submission.updateMany({
       where: { id: submissionId, status: { in: ["QUEUED", "RUNNING"] } },
       data: { status: "FAILED", verdict: "INTERNAL_ERROR" },
     });
+    if (count > 0) {
+      const submission = await prisma.submission.findUnique({
+        where: { id: submissionId },
+        select: { userId: true, testsTotal: true },
+      });
+      if (submission) {
+        await publishSubmissionUpdate(redisClient, {
+          submissionId,
+          userId: submission.userId,
+          status: "FAILED",
+          verdict: "INTERNAL_ERROR",
+          testsPassed: 0,
+          testsTotal: submission.testsTotal,
+        });
+      }
+    }
   } catch (err) {
     logger.error({ err, submissionId }, "Failed to record terminal failure");
   }
@@ -98,18 +146,21 @@ async function recordFinalFailure(job: Job<SubmissionJobData> | undefined): Prom
 export interface SubmissionWorkerHandle {
   worker: Worker<SubmissionJobData>;
   connection: Redis;
+  redisClient: Redis;
 }
 
 export function createSubmissionWorker(env: JudgeWorkerEnv): SubmissionWorkerHandle {
   // BullMQ requires `maxRetriesPerRequest: null` on Worker connections
-  // because it issues blocking commands.
+  // because it issues blocking commands. Kept separate from the
+  // general-purpose client used for pub/sub and the leaderboard cache.
   const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
+  const redisClient = createRedisClient(env);
 
   const worker = new Worker<SubmissionJobData>(
     SUBMISSION_QUEUE_NAME,
     async (job: Job<SubmissionJobData>) => {
       await Promise.race([
-        processSubmissionJob(job.data.submissionId, env),
+        processSubmissionJob(job.data.submissionId, { env, redisClient }),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Submission job timed out")), JOB_TIMEOUT_MS),
         ),
@@ -120,12 +171,12 @@ export function createSubmissionWorker(env: JudgeWorkerEnv): SubmissionWorkerHan
 
   worker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, err }, "Submission job failed");
-    void recordFinalFailure(job);
+    void recordFinalFailure(job, redisClient);
   });
 
   worker.on("error", (err) => {
     logger.error({ err }, "Worker connection error");
   });
 
-  return { worker, connection };
+  return { worker, connection, redisClient };
 }

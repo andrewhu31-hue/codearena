@@ -1,10 +1,9 @@
 // CodeArena database schema.
 //
-// Milestone 1 (Foundation) implemented User and RefreshToken fully.
-// Milestone 2 (Problems and submissions) implements Problem, TestCase, and
-// Submission/SubmissionResult fully. Contest-related models remain minimal
-// stubs so Milestone 4 can extend them with additive migrations instead of
-// reshaping the relational graph after real data exists.
+// Milestone 1 (Foundation) implemented User and RefreshToken.
+// Milestone 2 (Problems and submissions) implemented Problem, TestCase, and
+// Submission/SubmissionResult. Milestone 4 (Contests) implemented Contest,
+// ContestProblem, ContestRegistration, and ContestScore.
 
 generator client {
   provider = "prisma-client-js"
@@ -122,7 +121,6 @@ model TestCase {
   @@map("test_cases")
 }
 
-/// Stub for Milestone 4.
 model Contest {
   id          String             @id @default(uuid())
   name        String
@@ -141,7 +139,6 @@ model Contest {
   @@map("contests")
 }
 
-/// Stub for Milestone 4.
 model ContestProblem {
   id        String  @id @default(uuid())
   contestId String
@@ -155,7 +152,6 @@ model ContestProblem {
   @@map("contest_problems")
 }
 
-/// Stub for Milestone 4.
 model ContestRegistration {
   id           String   @id @default(uuid())
   contestId    String
@@ -212,7 +208,6 @@ model SubmissionResult {
   @@map("submission_results")
 }
 
-/// Stub for Milestone 4.
 model ContestScore {
   id          String   @id @default(uuid())
   contestId   String

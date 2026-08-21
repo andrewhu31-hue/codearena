@@ -3,6 +3,7 @@ import { prisma } from "@codearena/database";
 import { createApp } from "./app.js";
 import { createRedisClient } from "./lib/redis.js";
 import { createSubmissionQueue } from "./lib/queue.js";
+import { createRealtimeServer } from "./lib/realtime.js";
 import { logger } from "./lib/logger.js";
 
 const env = loadApiEnv();
@@ -14,12 +15,16 @@ const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, "API listening");
 });
 
+const realtime = createRealtimeServer(server, env);
+
 let shuttingDown = false;
 
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, "Shutting down");
+
+  await realtime.close();
 
   server.close(async (err) => {
     if (err) {
