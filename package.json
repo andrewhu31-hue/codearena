@@ -18,6 +18,7 @@
     "format:write": "prettier --write .",
     "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
     "dev:api": "npm run dev -w apps/api",
     "dev:worker": "npm run dev -w apps/judge-worker",
     "dev:web": "npm run dev -w apps/web",
@@ -29,7 +30,9 @@
     "@eslint/js": "^9.15.0",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.12.0",
     "prettier": "^3.3.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.15.0"
   },

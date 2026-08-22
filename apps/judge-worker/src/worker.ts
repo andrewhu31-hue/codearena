@@ -36,6 +36,8 @@ export async function processSubmissionJob(
     return;
   }
 
+  const startedAt = Date.now();
+
   // Idempotency (PRD §11): a retried or duplicate delivery of the same job
   // must not re-score a submission that has already reached a terminal
   // state. QUEUED/RUNNING are both reprocessed, so a worker crash between
@@ -105,7 +107,15 @@ export async function processSubmissionJob(
     await recomputeContestScore(redisClient, submission.contestId, submission.userId);
   }
 
-  logger.info({ submissionId, verdict, testsPassed, testsTotal: submission.testsTotal }, "Judged");
+  const judgeDurationMs = Date.now() - startedAt;
+  await redisClient.incr("metrics:judge:succeeded").catch((err) => {
+    logger.warn({ err }, "Failed to increment judge success metric");
+  });
+
+  logger.info(
+    { submissionId, verdict, testsPassed, testsTotal: submission.testsTotal, judgeDurationMs },
+    "Judged",
+  );
 }
 
 async function recordFinalFailure(
@@ -123,6 +133,9 @@ async function recordFinalFailure(
       data: { status: "FAILED", verdict: "INTERNAL_ERROR" },
     });
     if (count > 0) {
+      await redisClient.incr("metrics:judge:failed").catch((err) => {
+        logger.warn({ err }, "Failed to increment judge failure metric");
+      });
       const submission = await prisma.submission.findUnique({
         where: { id: submissionId },
         select: { userId: true, testsTotal: true },

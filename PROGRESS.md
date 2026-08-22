@@ -2,13 +2,13 @@
 
 Five-day build plan, one PRD milestone implemented and committed per day.
 
-| Day | Milestone                                                                                                      | Status  |
-| --- | -------------------------------------------------------------------------------------------------------------- | ------- |
-| 1   | Milestone 1 — Foundation (monorepo, Docker Compose, Postgres, Redis, auth, migrations, seed data, basic UI)    | done    |
-| 2   | Milestone 2 — Problems and submissions (catalog/workspace, Monaco, submission API/history, BullMQ, mock judge) | done    |
-| 3   | Milestone 3 — Judge workers (Python/JS/C++ execution, Docker isolation, resource limits, cleanup/retries)      | done    |
-| 4   | Milestone 4 — Contests (creation, registration, timing, scoring, Redis leaderboard, Socket.IO)                 | done    |
-| 5   | Milestone 5 — Quality and measurement (tests, logs, health checks, k6, cache benchmark, CI, docs)              | pending |
+| Day | Milestone                                                                                                      | Status |
+| --- | -------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | Milestone 1 — Foundation (monorepo, Docker Compose, Postgres, Redis, auth, migrations, seed data, basic UI)    | done   |
+| 2   | Milestone 2 — Problems and submissions (catalog/workspace, Monaco, submission API/history, BullMQ, mock judge) | done   |
+| 3   | Milestone 3 — Judge workers (Python/JS/C++ execution, Docker isolation, resource limits, cleanup/retries)      | done   |
+| 4   | Milestone 4 — Contests (creation, registration, timing, scoring, Redis leaderboard, Socket.IO)                 | done   |
+| 5   | Milestone 5 — Quality and measurement (tests, logs, health checks, k6, cache benchmark, CI, docs)              | done   |
 
 ## Day 1 verification (2026-08-15)
 
@@ -128,6 +128,54 @@ leaderboard` immediately reflected the correct score (150, matching the contest 
   `docker-compose.yml` still hasn't been exercised via an actual `docker compose up` (same caveat
   as Day 3) — all verification above used `npm run dev:worker`/`dev:api` talking to Docker
   directly on the host, not the containerized judge-worker service.
+
+## Day 5 verification (2026-08-21)
+
+Same session as Days 3–4, same real Postgres/Redis/Docker. This closes out the last milestone.
+
+- `npm run format`, `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` all
+  pass. `npm run test:coverage` (new this milestone) also passes across all four instrumented
+  workspaces — 73 tests total, same count as `npm run test` since coverage only adds instrumentation.
+- Added `apps/api/src/e2e.test.ts`: PRD §16's named end-to-end test, spawning the real judge-worker
+  as its own OS process (not imported in-process) so it's the actual service boundary under test.
+  First attempt was flaky — `TIME_LIMIT_EXCEEDED` on a problem left at the schema's default 1000ms
+  limit, because a freshly-spawned worker's first Docker container has more cold-start jitter than
+  a warmed-up one in the other suites. Fixed by giving that one test problem a generous 10s limit
+  (it's testing pipeline correctness, not performance) — not a product bug.
+- Added a rate-limit test to `auth.test.ts` (429 + `Retry-After` after 5 registrations/hour/IP) —
+  previously the only PRD §16 item ("unit-test ... rate limits") with no automated coverage at all.
+- Added `GET /metrics` (queue depth via BullMQ, judge success/failure counts via new Redis
+  counters `metrics:judge:succeeded`/`_failed`) and a `judgeDurationMs` field on judge-worker's
+  "Judged" log line — the queue-depth/worker-success-failure-counts/judge-duration half of PRD
+  §15 that wasn't covered yet.
+- Built `load-tests/` (three k6 scenarios + a cache benchmark) and **actually ran all of it** rather
+  than leaving it as unexecuted scripts — real numbers are in `docs/benchmarking.md`. Along the way:
+  - The first `general-traffic` run, at the default `GENERAL_RATE_LIMIT_MAX` (300/5min/IP), hit
+    73% failure — the general rate limiter working exactly as designed against many k6 VUs sharing
+    one IP. That's a genuine, useful result (confirms the limiter holds under concurrent load) but
+    it measures the limiter, not the API, so `GENERAL_RATE_LIMIT_MAX`/`_WINDOW_MS` were made
+    configurable (previously hardcoded) and a second run raised it to isolate throughput. Both
+    numbers are documented, not just the flattering one.
+  - `run-all.sh` originally used `set -e`, so that first threshold-breaching k6 run aborted the
+    whole script before cleanup or summarizing — fixed to treat a breached threshold as a valid
+    result (`|| true`), not a script failure.
+  - `setup/prepare.mjs` mints access tokens directly with the API's own JWT secret rather than
+    calling `POST /auth/login` per simulated user — documented as a deliberate choice, not a
+    shortcut: with every k6 VU sharing one IP, the (intentionally strict) login/register rate
+    limits would dominate the results and end up testing auth throttling instead of the target
+    endpoints.
+  - `cache-benchmark.mjs`'s summarizer initially crashed: it assumed k6's `--summary-export` JSON
+    nests metric fields under a `.values` key, but this k6 version puts them directly on the
+    metric object, with different shapes per metric type (trend vs. counter vs. rate). Fixed by
+    reading the actual JSON structure instead of assuming it.
+  - Real result: PostgreSQL p95 1.205ms vs. Redis p95 0.375ms for a 1,000-row leaderboard's top-100
+    read (68.9% faster) — including a real `EXPLAIN ANALYZE` plan showing the composite index
+    being used correctly.
+- Wrote `docs/architecture.md` (Mermaid system + sequence + ER diagrams, worker scaling, a
+  troubleshooting table drawn from issues actually hit across this build), `docs/api.md` (REST +
+  Socket.IO reference), and `docs/benchmarking.md` (the load-test/cache-benchmark numbers above,
+  with full environment/command provenance) — the remaining PRD §22 docs beyond
+  `docs/judge-security.md` (written in Milestone 3).
 
 ## Cadence
 

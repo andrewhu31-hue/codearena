@@ -28,6 +28,12 @@ const apiEnvSchema = z.object({
     .positive()
     .default(10 * 60 * 1000),
   PROBLEM_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  GENERAL_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+  GENERAL_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5 * 60 * 1000),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

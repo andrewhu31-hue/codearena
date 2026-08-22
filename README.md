@@ -4,10 +4,12 @@ A full-stack competitive programming platform: register, browse problems, submit
 compete in timed contests, and watch live rankings. See [`PRD.md`](./PRD.md) for the full product
 requirements and [`PROGRESS.md`](./PROGRESS.md) for the milestone build plan.
 
-**Status: Milestone 4 — Contests.** Authentication, the problem catalog/workspace, the submission
-pipeline, real Docker-sandboxed Python/JavaScript/C++ execution, and timed contests with a
-Redis-backed live leaderboard and Socket.IO push are all in place. Quality/measurement work (load
-tests, cache benchmark, expanded docs) is the last milestone (see [`PROGRESS.md`](./PROGRESS.md)).
+**Status: all 5 milestones complete.** Authentication, the problem catalog/workspace, the
+submission pipeline, real Docker-sandboxed Python/JavaScript/C++ execution, timed contests with a
+Redis-backed live leaderboard and Socket.IO push, and the quality/measurement work (metrics
+endpoint, expanded tests, k6 load tests, a Postgres-vs-Redis cache benchmark, coverage, expanded
+docs) are all in place — see [`PROGRESS.md`](./PROGRESS.md) for the day-by-day build log and
+[`docs/benchmarking.md`](./docs/benchmarking.md) for real measured numbers.
 
 ## Stack
 
@@ -32,8 +34,12 @@ codearena/
     config/               Environment-variable validation
   infrastructure/
     docker/               Dockerfiles for web, api, and judge-worker
+  load-tests/              k6 scenarios and the Postgres-vs-Redis cache benchmark
   docs/
-    judge-security.md     Sandbox model, threat model, and known limitations
+    architecture.md        System/sequence diagrams, data model, worker scaling, troubleshooting
+    api.md                 REST + Socket.IO reference
+    judge-security.md      Sandbox model, threat model, and known limitations
+    benchmarking.md        Real measured numbers from load-tests/
   docker-compose.yml
 ```
 
@@ -185,7 +191,22 @@ earlier refetch — a dropped or never-established socket degrades to "slightly 
   still succeeds.
 - Rate limits, all Redis-backed so they hold across horizontally scaled API instances: login
   (10/15min), register (5/hour), submissions (`SUBMISSION_RATE_LIMIT_MAX`/`_WINDOW_MS` per user,
-  default 30/10min), and a general per-IP limit on every request (300/5min).
+  default 30/10min), and a general per-IP limit on every request
+  (`GENERAL_RATE_LIMIT_MAX`/`_WINDOW_MS`, default 300/5min). The general limit is necessarily
+  per-IP, so shared-IP/NAT'd traffic (or a load test run from one machine) hits it faster than a
+  single browser would — see [`load-tests/README.md`](./load-tests/README.md).
+
+## Observability
+
+- **Structured JSON logs** (`pino`/`pino-http`) on both the API and judge-worker, with a request ID
+  on every API log line (`X-Request-Id` response header too) and a `judgeDurationMs` field on every
+  "Judged" log line. Passwords, tokens, and submitted source code are redacted from logs by name
+  (`apps/api/src/lib/logger.ts`, `apps/judge-worker/src/lib/logger.ts`) — PRD §15.
+- **`GET /health`** — liveness, always `200` if the process is up.
+- **`GET /ready`** — readiness; `200` only if Postgres and Redis both respond, `503` otherwise.
+- **`GET /metrics`** — `{ queue: {waiting, active, delayed, failed, completed}, judge: {succeeded, failed} }`:
+  live BullMQ queue depth plus judge-worker's Redis-backed success/failure counters
+  (`metrics:judge:succeeded`/`metrics:judge:failed`, incremented in `apps/judge-worker/src/worker.ts`).
 
 ## Authentication design
 
@@ -207,12 +228,24 @@ earlier refetch — a dropped or never-established socket degrades to "slightly 
 | `npm run format`                           | Check Prettier formatting                                                                                             |
 | `npm run typecheck`                        | Build workspace packages, then type-check every app                                                                   |
 | `npm run test`                             | Run unit/integration tests (integration suites are skipped unless `DATABASE_URL`/`REDIS_URL` point at Postgres/Redis) |
+| `npm run test:coverage`                    | Same, with a v8 coverage report per workspace                                                                         |
 | `npm run build`                            | Production build of all packages and apps                                                                             |
 | `npm run db:generate`                      | Regenerate the Prisma client                                                                                          |
 | `npm run db:migrate`                       | Apply Prisma migrations                                                                                               |
 | `npm run db:seed`                          | Seed the database                                                                                                     |
 | `npm run dev:worker`                       | Run the judge worker on the host                                                                                      |
 | `docker compose up --scale judge-worker=4` | Run 4 worker replicas                                                                                                 |
+| `load-tests/run-all.sh`                    | Run all three k6 scenarios and write `load-tests/results/summary.md`                                                  |
+| `node load-tests/cache-benchmark.mjs`      | Run the Postgres-vs-Redis leaderboard read benchmark                                                                  |
+
+## Load testing and benchmarks
+
+`load-tests/` (see [`load-tests/README.md`](./load-tests/README.md) for prerequisites and design
+notes) has three k6 scenarios — general API browsing, a contest-start traffic spike, and concurrent
+submissions with time-to-judge measurement — plus a reproducible PostgreSQL-vs-Redis leaderboard
+read benchmark with a real `EXPLAIN ANALYZE` query plan. Every number in
+[`docs/benchmarking.md`](./docs/benchmarking.md) came from actually running these scripts; nothing
+is hardcoded or estimated (PRD §1/§17/§22).
 
 ## Environment variables
 
@@ -227,6 +260,7 @@ See [`.env.example`](./.env.example) for the full list. Notable ones:
 | `REFRESH_TOKEN_TTL_DAYS`                   | Refresh token lifetime (default 30 days)                                                                |
 | `CORS_ORIGIN`                              | Origin allowed to call the API with credentials                                                         |
 | `SUBMISSION_RATE_LIMIT_MAX`/`_WINDOW_MS`   | Per-user submission rate limit                                                                          |
+| `GENERAL_RATE_LIMIT_MAX`/`_WINDOW_MS`      | Per-IP limit applied to every request                                                                   |
 | `PROBLEM_CACHE_TTL_SECONDS`                | TTL for cached public problem metadata                                                                  |
 | `WORKER_CONCURRENCY`                       | Judge worker's concurrent job count                                                                     |
 
@@ -260,20 +294,27 @@ The API and judge worker both refuse to start if a required variable is missing 
 - `apps/api/src/contests.test.ts` — integration tests for contest visibility (public vs. private),
   admin-only create, registration and duplicate rejection, server-side timing/registration/
   problem-membership enforcement on contest submissions, and the leaderboard read path including
-  the Postgres rebuild-on-empty-cache case.
+  the Postgres rebuild-on-empty-cache case. Also covers the register rate limit itself (429 +
+  `Retry-After` after 5 requests/hour/IP), in `auth.test.ts`.
+- `apps/api/src/e2e.test.ts` — PRD §16's named deterministic end-to-end test: register → open a
+  problem → submit a correct solution → get judged `ACCEPTED` → leaderboard updates. Unlike every
+  other suite, this one spawns the real judge-worker as its own OS process (not imported
+  in-process) so it exercises the actual Postgres/Redis/HTTP service boundary the same way Docker
+  Compose does, not a shortcut. Needs Postgres, Redis, and Docker; skips itself otherwise.
 - Run integration suites locally with `docker compose up -d postgres redis` and Docker running,
-  then `npm run test`. CI pre-pulls the three judge runtime images
-  (`python:3.12-slim`/`node:20-slim`/`gcc:13`) before testing so the Docker-dependent suites don't
-  burn their timeout on a cold pull.
+  then `npm run test` (or `npm run test:coverage` for a coverage report — see
+  [`docs/benchmarking.md`](./docs/benchmarking.md#test-coverage) for a real snapshot). CI pre-pulls
+  the three judge runtime images (`python:3.12-slim`/`node:20-slim`/`gcc:13`) before testing so the
+  Docker-dependent suites don't burn their timeout on a cold pull.
 
 ## CI
 
 `.github/workflows/ci.yml` installs dependencies, checks formatting, lints, runs migrations against
-a Postgres/Redis service container, type-checks, tests, builds every package/app, and builds all
-three Docker images (api, judge-worker, web). No secrets are embedded — CI uses throwaway dev-only
-credentials.
+a Postgres/Redis service container, type-checks, tests with coverage (uploaded as a build artifact),
+builds every package/app, and builds all three Docker images (api, judge-worker, web). No secrets
+are embedded — CI uses throwaway dev-only credentials.
 
-## Known limitations at this milestone
+## Known limitations
 
 - Problem and contest administration have no dedicated UI yet — only the REST endpoints
   (`POST`/`PATCH /problems`, `/contests`, admin-only).
@@ -285,4 +326,7 @@ credentials.
 - Docker is not a complete sandbox, memory measurement is best-effort, and image tags aren't
   pinned to digests — see [`docs/judge-security.md`](./docs/judge-security.md)'s limitations
   section for the full list and reasoning.
-- No load tests or benchmark scripts yet (Milestone 5).
+- Load tests and the cache benchmark were run on a single local developer machine, not production
+  infrastructure — see [`docs/benchmarking.md`](./docs/benchmarking.md) for exact numbers and
+  environment, and re-run them yourself before treating any number as representative of a real
+  deployment.

@@ -138,4 +138,28 @@ describeIfInfra("auth flow", () => {
       .send();
     expect(replay.status).toBe(401);
   });
+
+  it("rate-limits registration per IP and reports Retry-After", async () => {
+    // Registration is capped at 5/hour/IP (apps/api/src/routes/auth.routes.ts).
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app)
+        .post("/api/v1/auth/register")
+        .send({
+          email: `ratelimit${i}@example.com`,
+          username: `ratelimit${i}`,
+          password: "correct-horse-battery",
+        });
+      expect(res.status).toBe(201);
+    }
+
+    const blocked = await request(app).post("/api/v1/auth/register").send({
+      email: "ratelimit5@example.com",
+      username: "ratelimit5",
+      password: "correct-horse-battery",
+    });
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error.code).toBe("RATE_LIMITED");
+    expect(blocked.headers["retry-after"]).toBeDefined();
+  });
 });

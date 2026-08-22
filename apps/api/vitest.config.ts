@@ -8,5 +8,10 @@ export default defineConfig({
     // reset it in beforeEach; running files in parallel causes one file's
     // reset to wipe another's fixtures mid-test.
     fileParallelism: false,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary", "html"],
+      exclude: ["**/*.test.ts", "**/*.config.ts", "src/index.ts"],
+    },
   },
 });

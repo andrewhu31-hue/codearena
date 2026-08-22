@@ -79,8 +79,11 @@ export function createUserRateLimiter(
 /**
  * A general, generous limit applied to every request, distinct from the
  * tighter per-endpoint limits above (PRD §13: "separate limits ... for
- * general requests").
+ * general requests"). Configurable because it's necessarily per-IP: a
+ * default tuned for one browser makes k6 (or any shared-IP/NAT'd traffic)
+ * hit it almost immediately at even modest concurrency — see
+ * load-tests/README.md.
  */
-export function createGeneralRateLimiter(redis: Redis) {
-  return createRateLimiter(redis, "general", 300, 5 * 60 * 1000, (req) => `general:${req.ip}`);
+export function createGeneralRateLimiter(redis: Redis, max: number, windowMs: number) {
+  return createRateLimiter(redis, "general", max, windowMs, (req) => `general:${req.ip}`);
 }
