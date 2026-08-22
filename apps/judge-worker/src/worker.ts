@@ -59,6 +59,7 @@ export async function processSubmissionJob(
 
   const { verdict, testResults, compilerOutput, runtimeMs, memoryKb } = await evaluateSubmission({
     submissionId,
+    problemSlug: submission.problem.slug,
     language: submission.language,
     sourceCode: submission.sourceCode,
     timeLimitMs: submission.problem.timeLimitMs,

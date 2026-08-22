@@ -71,6 +71,37 @@ describeIfDocker("evaluateSubmission (real Docker execution)", () => {
     expect(result.testResults[0]?.passed).toBe(true);
   }, 60_000);
 
+  it("accepts LeetCode-style C++ without main via auto-wrapper", async () => {
+    const result = await evaluateSubmission({
+      submissionId: `test-${randomUUID()}`,
+      problemSlug: "two-sum",
+      language: "CPP",
+      sourceCode: `
+          #include <bits/stdc++.h>
+          using namespace std;
+
+          class Solution {
+          public:
+              vector<int> twoSum(vector<int>& nums, int target) {
+                  unordered_map<int, int> seen;
+                  for (int i = 0; i < static_cast<int>(nums.size()); i++) {
+                      int need = target - nums[i];
+                      auto it = seen.find(need);
+                      if (it != seen.end()) return {it->second, i};
+                      seen[nums[i]] = i;
+                  }
+                  return {};
+              }
+          };
+        `,
+      timeLimitMs: 5000,
+      memoryLimitMb: 256,
+      testCases: [testCase("2 7 11 15\n9", "0 1")],
+    });
+    expect(result.verdict).toBe("ACCEPTED");
+    expect(result.testResults[0]?.passed).toBe(true);
+  }, 60_000);
+
   it("reports COMPILATION_ERROR for invalid C++ without running any tests", async () => {
     const result = await evaluateSubmission({
       submissionId: `test-${randomUUID()}`,

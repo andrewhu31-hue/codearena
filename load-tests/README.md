@@ -23,7 +23,7 @@ covers how to run them yourself.
 ## Running everything
 
 ```bash
-export DATABASE_URL=postgresql://codearena:codearena@localhost:5432/codearena
+export DATABASE_URL=postgresql://codearena:codearena@localhost:5433/codearena
 export JWT_ACCESS_SECRET=<same secret the running API uses>
 ./run-all.sh          # seeds data, runs all three k6 scenarios, cleans up, writes results/summary.md
 node cache-benchmark.mjs

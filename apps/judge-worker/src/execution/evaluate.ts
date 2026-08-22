@@ -23,6 +23,7 @@ export interface EvaluateTestCase {
 
 export interface EvaluateSubmissionInput {
   submissionId: string;
+  problemSlug?: string;
   language: Language;
   sourceCode: string;
   timeLimitMs: number;
@@ -53,6 +54,192 @@ export interface EvaluatorResult {
   compilerOutput: string | null;
   runtimeMs: number | null;
   memoryKb: number | null;
+}
+
+interface CppHarnessSpec {
+  method: string;
+  kind:
+  | "vecInt_target_to_vecInt"
+  | "string_to_string"
+  | "int_to_vecString"
+  | "vecInt_target_to_int"
+  | "string_to_int"
+  | "intervals_to_intervals";
+}
+
+const CPP_HARNESS_BY_SLUG: Record<string, CppHarnessSpec> = {
+  "two-sum": { method: "twoSum", kind: "vecInt_target_to_vecInt" },
+  "reverse-string": { method: "reverseString", kind: "string_to_string" },
+  "fizz-buzz": { method: "fizzBuzz", kind: "int_to_vecString" },
+  "binary-search": { method: "search", kind: "vecInt_target_to_int" },
+  "longest-substring": { method: "lengthOfLongestSubstring", kind: "string_to_int" },
+  "merge-intervals": { method: "merge", kind: "intervals_to_intervals" },
+};
+
+function hasCppMain(sourceCode: string): boolean {
+  return /\bint\s+main\s*\(/.test(sourceCode);
+}
+
+function buildCppHarness(slug?: string): string | null {
+  if (!slug) return null;
+  const spec = CPP_HARNESS_BY_SLUG[slug];
+  if (!spec) return null;
+
+  const commonHelpers = String.raw`
+
+static vector<int> parseIntLine(const string& line) {
+  vector<int> nums;
+  stringstream ss(line);
+  int x;
+  while (ss >> x) nums.push_back(x);
+  return nums;
+}
+
+static string trimTrailingNewline(string s) {
+  while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+  return s;
+}
+
+static void printVecInt(const vector<int>& v) {
+  for (size_t i = 0; i < v.size(); i++) {
+    if (i) cout << ' ';
+    cout << v[i];
+  }
+}
+
+static void printVecStringLines(const vector<string>& v) {
+  for (size_t i = 0; i < v.size(); i++) {
+    if (i) cout << '\n';
+    cout << v[i];
+  }
+}
+
+static vector<vector<int>> parseIntervalsFromAllInput(const string& all) {
+  vector<vector<int>> intervals;
+  stringstream ss(all);
+  int a, b;
+  while (ss >> a >> b) intervals.push_back({a, b});
+  return intervals;
+}
+
+static void printIntervals(const vector<vector<int>>& intervals) {
+  for (size_t i = 0; i < intervals.size(); i++) {
+    if (i) cout << '\n';
+    if (intervals[i].size() >= 2) cout << intervals[i][0] << ' ' << intervals[i][1];
+  }
+}
+`;
+
+  const mainByKind: Record<CppHarnessSpec["kind"], string> = {
+    vecInt_target_to_vecInt: String.raw`
+int main() {
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+
+  string numsLine, targetLine;
+  getline(cin, numsLine);
+  getline(cin, targetLine);
+
+  vector<int> nums = parseIntLine(numsLine);
+  int target = 0;
+  if (!targetLine.empty()) {
+    stringstream ss(targetLine);
+    ss >> target;
+  }
+
+  Solution solution;
+  vector<int> ans = solution.${spec.method}(nums, target);
+  printVecInt(ans);
+  return 0;
+}
+`,
+    string_to_string: String.raw`
+int main() {
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+
+  string s;
+  getline(cin, s);
+  s = trimTrailingNewline(s);
+
+  Solution solution;
+  cout << solution.${spec.method}(s);
+  return 0;
+}
+`,
+    int_to_vecString: String.raw`
+int main() {
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+
+  int n = 0;
+  cin >> n;
+
+  Solution solution;
+  vector<string> ans = solution.${spec.method}(n);
+  printVecStringLines(ans);
+  return 0;
+}
+`,
+    vecInt_target_to_int: String.raw`
+int main() {
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+
+  string numsLine, targetLine;
+  getline(cin, numsLine);
+  getline(cin, targetLine);
+
+  vector<int> nums = parseIntLine(numsLine);
+  int target = 0;
+  if (!targetLine.empty()) {
+    stringstream ss(targetLine);
+    ss >> target;
+  }
+
+  Solution solution;
+  cout << solution.${spec.method}(nums, target);
+  return 0;
+}
+`,
+    string_to_int: String.raw`
+int main() {
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+
+  string s;
+  getline(cin, s);
+  s = trimTrailingNewline(s);
+
+  Solution solution;
+  cout << solution.${spec.method}(s);
+  return 0;
+}
+`,
+    intervals_to_intervals: String.raw`
+int main() {
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+
+  string all((istreambuf_iterator<char>(cin)), istreambuf_iterator<char>());
+  vector<vector<int>> intervals = parseIntervalsFromAllInput(all);
+
+  Solution solution;
+  vector<vector<int>> ans = solution.${spec.method}(intervals);
+  printIntervals(ans);
+  return 0;
+}
+`,
+  };
+
+  return `${commonHelpers}\n${mainByKind[spec.kind]}`;
+}
+
+function maybeWrapCppLeetCodeSource(sourceCode: string, problemSlug?: string): string {
+  if (hasCppMain(sourceCode)) return sourceCode;
+  const harness = buildCppHarness(problemSlug);
+  if (!harness) return sourceCode;
+  return `${sourceCode}\n${harness}`;
 }
 
 function containerName(kind: "compile" | "run", submissionId: string): string {
@@ -139,12 +326,16 @@ async function runOneTestCase(
  */
 export async function evaluateSubmission(input: EvaluateSubmissionInput): Promise<EvaluatorResult> {
   const config = LANGUAGE_CONFIG[input.language];
+  const sourceCode =
+    input.language === "CPP"
+      ? maybeWrapCppLeetCodeSource(input.sourceCode, input.problemSlug)
+      : input.sourceCode;
   const containerBaseDir = input.workspaceDir ?? tmpdir();
   const hostBaseDir = input.workspaceHostDir ?? containerBaseDir;
   const workspace = await createWorkspace(
     input.submissionId,
     config.sourceFilename,
-    input.sourceCode,
+    sourceCode,
     containerBaseDir,
     hostBaseDir,
   );
