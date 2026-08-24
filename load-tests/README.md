@@ -10,6 +10,8 @@ covers how to run them yourself.
 - The API, judge worker, Postgres, and Redis all running (`docker compose up` or the host-native
   flow in the main README), and `DATABASE_URL`/`REDIS_URL`/`JWT_ACCESS_SECRET` in your shell
   matching that running API's own configuration.
+- `DATABASE_URL` must target the dedicated load-test database (`codearena_loadtest` by default).
+  Setup/cleanup scripts refuse to run against any other database name.
 
 ## What each scenario measures
 
@@ -23,7 +25,7 @@ covers how to run them yourself.
 ## Running everything
 
 ```bash
-export DATABASE_URL=postgresql://codearena:codearena@localhost:5433/codearena
+export DATABASE_URL=postgresql://codearena:codearena@localhost:5433/codearena_loadtest
 export JWT_ACCESS_SECRET=<same secret the running API uses>
 ./run-all.sh          # seeds data, runs all three k6 scenarios, cleans up, writes results/summary.md
 node cache-benchmark.mjs

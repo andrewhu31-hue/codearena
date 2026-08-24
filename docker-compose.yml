@@ -97,11 +97,11 @@ services:
       # containers, so the host needs the host-side path, not this
       # container's own view of it. Requires running `docker compose` from
       # the repo root, so $PWD here is the repo root. See docs/judge-security.md.
-      JUDGE_WORKSPACE_DIR: /judge-workspaces
+      JUDGE_WORKSPACE_DIR: ${PWD}/.judge-workspaces
       JUDGE_WORKSPACE_HOST_DIR: ${PWD}/.judge-workspaces
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./.judge-workspaces:/judge-workspaces
+      - ${PWD}/.judge-workspaces:${PWD}/.judge-workspaces
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,6 +109,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    deploy:
+      replicas: ${JUDGE_WORKER_REPLICAS:-4}
 
   web:
     build:

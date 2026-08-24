@@ -34,6 +34,18 @@ interface SubmissionRecord {
   problem: { slug: string; title: string };
 }
 
+export interface SubmissionCreateTimings {
+  idempotencyLookupMs: number;
+  dbInsertMs: number;
+  queueAddMs: number;
+}
+
+export interface CreateSubmissionResult {
+  submission: SubmissionSummary;
+  created: boolean;
+  timings: SubmissionCreateTimings;
+}
+
 function toSummary(row: SubmissionRecord): SubmissionSummary {
   return {
     id: row.id,
@@ -93,7 +105,14 @@ export async function createSubmission(
   queue: Queue,
   userId: string,
   input: CreateSubmissionInput,
-): Promise<SubmissionSummary> {
+  options?: { idempotencyKey?: string },
+): Promise<CreateSubmissionResult> {
+  const timings: SubmissionCreateTimings = {
+    idempotencyLookupMs: 0,
+    dbInsertMs: 0,
+    queueAddMs: 0,
+  };
+
   const problem = await problemService.getProblemForSubmission(input.problemId);
   if (!problem.supportedLanguages.includes(input.language)) {
     throw AppError.validation(`${input.language} is not supported for this problem`);
@@ -103,28 +122,77 @@ export async function createSubmission(
     await validateContestSubmission(input.contestId, input.problemId, userId);
   }
 
-  const submission = await prisma.submission.create({
-    data: {
-      userId,
-      problemId: input.problemId,
-      contestId: input.contestId,
-      language: input.language,
-      sourceCode: input.sourceCode,
-      testsTotal: problem._count.testCases,
-    },
-    include: PROBLEM_SELECT,
-  });
+  const idempotencyKey = options?.idempotencyKey?.trim();
+  const idempotencyScope = input.contestId ? `contest:${input.contestId}` : `practice:${input.problemId}`;
+
+  if (idempotencyKey) {
+    const lookupStartedAt = Date.now();
+    const existing = await prisma.submission.findFirst({
+      where: { userId, idempotencyKey, idempotencyScope },
+      include: PROBLEM_SELECT,
+      orderBy: { createdAt: "desc" },
+    });
+    timings.idempotencyLookupMs += Date.now() - lookupStartedAt;
+    if (existing) {
+      return { submission: toSummary(existing), created: false, timings };
+    }
+  }
+
+  let submission;
+  try {
+    const insertStartedAt = Date.now();
+    submission = await prisma.submission.create({
+      data: {
+        userId,
+        problemId: input.problemId,
+        contestId: input.contestId,
+        language: input.language,
+        sourceCode: input.sourceCode,
+        testsTotal: problem._count.testCases,
+        idempotencyKey,
+        idempotencyScope: idempotencyKey ? idempotencyScope : null,
+      },
+      include: PROBLEM_SELECT,
+    });
+    timings.dbInsertMs = Date.now() - insertStartedAt;
+  } catch (error) {
+    if (idempotencyKey && typeof error === "object" && error && "code" in error) {
+      const knownCode = (error as { code?: string }).code;
+      if (knownCode === "P2002") {
+        const conflictLookupStartedAt = Date.now();
+        const existing = await prisma.submission.findFirst({
+          where: { userId, idempotencyKey, idempotencyScope },
+          include: PROBLEM_SELECT,
+          orderBy: { createdAt: "desc" },
+        });
+        timings.idempotencyLookupMs += Date.now() - conflictLookupStartedAt;
+        if (existing) {
+          return { submission: toSummary(existing), created: false, timings };
+        }
+      }
+    }
+    throw error;
+  }
 
   // Queue jobs carry only the submission ID (PRD §7); the worker re-reads
   // source and test cases from Postgres, which stays authoritative.
   // jobId = submission.id gives BullMQ built-in duplicate-job prevention.
+  const queueAddStartedAt = Date.now();
   await queue.add(
     "evaluate",
     { submissionId: submission.id },
     { ...SUBMISSION_JOB_OPTS, jobId: submission.id },
   );
+  timings.queueAddMs = Date.now() - queueAddStartedAt;
 
-  return toSummary(submission);
+  // Guarded update: set only once to preserve immutable lifecycle semantics.
+  await prisma.$executeRaw`
+    UPDATE submissions
+    SET "enqueuedAt" = COALESCE("enqueuedAt", NOW())
+    WHERE id = ${submission.id}
+  `;
+
+  return { submission: toSummary(submission), created: true, timings };
 }
 
 export async function getSubmissionById(

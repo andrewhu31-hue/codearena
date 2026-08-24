@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 import { Redis } from "ioredis";
-import { prisma } from "@codearena/database";
+import { assertDedicatedTestDatabase, prisma } from "@codearena/database";
 import { loadApiEnv } from "@codearena/config";
 import { createApp } from "./app.js";
 import { createSubmissionQueue } from "./lib/queue.js";
@@ -16,6 +16,10 @@ import { createSubmissionQueue } from "./lib/queue.js";
  */
 const hasTestInfra = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);
 const describeIfInfra = hasTestInfra ? describe : describe.skip;
+
+function assertSafeCleanupTarget() {
+  assertDedicatedTestDatabase(process.env.DATABASE_URL ?? "", "API auth test cleanup");
+}
 
 describeIfInfra("auth flow", () => {
   let app: Express;
@@ -37,6 +41,7 @@ describeIfInfra("auth flow", () => {
   });
 
   beforeEach(async () => {
+    assertSafeCleanupTarget();
     // Register/login are rate-limited per IP in Redis; without a reset here,
     // tests would exhaust the real limit partway through the suite.
     await redis.flushdb();

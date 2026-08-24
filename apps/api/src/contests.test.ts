@@ -2,13 +2,17 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 import { Redis } from "ioredis";
-import { prisma } from "@codearena/database";
+import { assertDedicatedTestDatabase, prisma } from "@codearena/database";
 import { loadApiEnv } from "@codearena/config";
 import { createApp } from "./app.js";
 import { createSubmissionQueue } from "./lib/queue.js";
 
 const hasTestInfra = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);
 const describeIfInfra = hasTestInfra ? describe : describe.skip;
+
+function assertSafeCleanupTarget() {
+  assertDedicatedTestDatabase(process.env.DATABASE_URL ?? "", "API contests test cleanup");
+}
 
 describeIfInfra("contests", () => {
   let app: Express;
@@ -30,6 +34,7 @@ describeIfInfra("contests", () => {
   });
 
   beforeEach(async () => {
+    assertSafeCleanupTarget();
     await redis.flushdb();
     await queueHandle.queue.drain(true);
     await prisma.contestScore.deleteMany();

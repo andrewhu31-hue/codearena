@@ -17,13 +17,19 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { prisma } from "@codearena/database";
+import { assertLoadTestDatabase, prisma } from "@codearena/database";
 
-const USER_COUNT = Number(process.argv[2] || process.env.LOAD_TEST_USERS || 60);
+const USER_COUNT = Number(process.argv[2] || process.env.LOAD_TEST_USERS || 100);
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 if (!JWT_ACCESS_SECRET) {
   throw new Error("JWT_ACCESS_SECRET is required (must match the running API's secret)");
 }
+
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL is required");
+}
+assertLoadTestDatabase(DATABASE_URL, "load-tests setup/prepare.mjs");
 
 const outPath = fileURLToPath(new URL("../results/context.json", import.meta.url));
 
@@ -53,7 +59,13 @@ async function main() {
       description: "Echoes its input. Used only by load-tests/, not shown in the real catalog.",
       supportedLanguages: ["PYTHON"],
       timeLimitMs: 5000,
-      testCases: { create: [{ input: "hi", expectedOutput: "hi", isSample: true }] },
+      testCases: {
+        create: [
+          { input: "hi", expectedOutput: "hi", isSample: true },
+          { input: "line-2", expectedOutput: "line-2", isSample: false },
+          { input: "symbols-123", expectedOutput: "symbols-123", isSample: false },
+        ],
+      },
     },
   });
 
@@ -74,6 +86,7 @@ async function main() {
   });
 
   const context = {
+    runTag: `competition-context-${stamp}`,
     problemId: problem.id,
     problemSlug: problem.slug,
     contestId: contest.id,

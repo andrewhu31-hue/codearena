@@ -9,7 +9,7 @@ import { createUserRateLimiter } from "../middleware/rateLimit.js";
 
 export function createSubmissionRouter(env: ApiEnv, redis: Redis, queue: Queue): Router {
   const router = Router();
-  const controller = createSubmissionController(queue);
+  const controller = createSubmissionController(queue, redis);
   const submissionLimiter = createUserRateLimiter(
     redis,
     "submission",

@@ -2,9 +2,15 @@
 // don't accumulate throwaway data in a real database.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { prisma } from "@codearena/database";
+import { assertLoadTestDatabase, prisma } from "@codearena/database";
 
 const contextPath = fileURLToPath(new URL("../results/context.json", import.meta.url));
+
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL is required");
+}
+assertLoadTestDatabase(DATABASE_URL, "load-tests setup/cleanup.mjs");
 
 async function main() {
   const context = JSON.parse(readFileSync(contextPath, "utf8"));

@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Express } from "express";
 import { Redis } from "ioredis";
-import { prisma } from "@codearena/database";
+import { assertDedicatedTestDatabase, prisma } from "@codearena/database";
 import { loadApiEnv } from "@codearena/config";
 import type { LeaderboardEntry } from "@codearena/shared";
 import { createApp } from "./app.js";
@@ -23,6 +23,10 @@ function isDockerAvailable(): boolean {
 const hasTestInfra = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);
 const canRun = hasTestInfra && isDockerAvailable();
 const describeIfReady = canRun ? describe : describe.skip;
+
+function assertSafeCleanupTarget() {
+  assertDedicatedTestDatabase(process.env.DATABASE_URL ?? "", "API e2e test cleanup");
+}
 
 function waitForWorkerReady(proc: ChildProcess, timeoutMs = 20_000): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -54,7 +58,7 @@ async function pollUntilTerminal(
   timeoutMs = 30_000,
 ) {
   const deadline = Date.now() + timeoutMs;
-  for (;;) {
+  for (; ;) {
     const res = await request(app)
       .get(`/api/v1/submissions/${submissionId}`)
       .set("Authorization", `Bearer ${token}`);
@@ -71,7 +75,7 @@ async function pollForLeaderboardEntry(
   timeoutMs = 10_000,
 ): Promise<LeaderboardEntry> {
   const deadline = Date.now() + timeoutMs;
-  for (;;) {
+  for (; ;) {
     const res = await request(app).get(`/api/v1/contests/${contestId}/leaderboard`);
     const entry = (res.body.entries as LeaderboardEntry[] | undefined)?.find(
       (e) => e.userId === userId,
@@ -125,6 +129,7 @@ describeIfReady("full end-to-end lifecycle (PRD §16)", () => {
   });
 
   beforeEach(async () => {
+    assertSafeCleanupTarget();
     await redis.flushdb();
     await queueHandle.queue.drain(true);
     await prisma.contestScore.deleteMany();

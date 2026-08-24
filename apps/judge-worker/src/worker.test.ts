@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
-import { prisma } from "@codearena/database";
+import { assertDedicatedTestDatabase, prisma } from "@codearena/database";
 import { loadJudgeWorkerEnv } from "@codearena/config";
 import { SUBMISSION_QUEUE_NAME } from "@codearena/shared";
 import { createSubmissionWorker, type SubmissionWorkerHandle } from "./worker.js";
@@ -24,9 +24,13 @@ const hasTestInfra = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);
 const canRun = hasTestInfra && isDockerAvailable();
 const describeIfReady = canRun ? describe : describe.skip;
 
+function assertSafeCleanupTarget() {
+  assertDedicatedTestDatabase(process.env.DATABASE_URL ?? "", "Judge worker lifecycle test cleanup");
+}
+
 async function waitForTerminalStatus(submissionId: string, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
-  for (;;) {
+  for (; ;) {
     const submission = await prisma.submission.findUniqueOrThrow({ where: { id: submissionId } });
     if (submission.status === "COMPLETED" || submission.status === "FAILED") return submission;
     if (Date.now() > deadline) throw new Error("Timed out waiting for submission to finish");
@@ -36,7 +40,7 @@ async function waitForTerminalStatus(submissionId: string, timeoutMs = 30_000) {
 
 async function waitForContestScore(contestId: string, userId: string, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
-  for (;;) {
+  for (; ;) {
     const score = await prisma.contestScore.findUnique({
       where: { contestId_userId: { contestId, userId } },
     });
@@ -89,6 +93,7 @@ describeIfReady("submission lifecycle", () => {
   });
 
   afterEach(async () => {
+    assertSafeCleanupTarget();
     await prisma.contestScore.deleteMany();
     await prisma.contestRegistration.deleteMany();
     await prisma.contestProblem.deleteMany();
