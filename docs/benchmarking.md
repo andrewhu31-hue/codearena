@@ -7,6 +7,44 @@ Re-run them yourself; expect different absolute numbers on different hardware, b
 relative shape (Redis faster than Postgres for the ranking read; the rate limiter kicking in under
 concurrent same-IP traffic).
 
+## Final capacity validation (2026-08-24)
+
+Supported capacity claim from two corrected end-to-end runs:
+
+- `50/50` full journeys completed
+- `50/50` accepted
+- `50/50` leaderboard-reflected
+- zero final idempotent GET failures
+- zero P1001, lock/stall, INTERNAL_ERROR, and leaked containers
+
+The same result was reproduced twice:
+
+- `final-e2e-50-corrected-1787601679`
+- `final-e2e-50-corrected-rerestore-1787609192`
+
+Artifacts:
+
+- [load-tests/results/final-e2e-50-corrected-1787601679-raw.json](../load-tests/results/final-e2e-50-corrected-1787601679-raw.json)
+- [load-tests/results/final-e2e-50-corrected-1787601679-summary.json](../load-tests/results/final-e2e-50-corrected-1787601679-summary.json)
+- [load-tests/results/final-e2e-50-corrected-rerestore-1787609192-raw.json](../load-tests/results/final-e2e-50-corrected-rerestore-1787609192-raw.json)
+- [load-tests/results/final-e2e-50-corrected-rerestore-1787609192-summary.json](../load-tests/results/final-e2e-50-corrected-rerestore-1787609192-summary.json)
+
+Stretch-test result (not a supported claim):
+
+- `66/100` full journeys completed
+- all 66 admitted submissions were accepted and leaderboard-reflected
+- failed journeys occurred before submission creation because API GET stages hit saturation/429
+- therefore 100 active users is not currently a supported capacity claim
+
+Artifacts:
+
+- [load-tests/results/final-100-e2e-1787607937-raw.json](../load-tests/results/final-100-e2e-1787607937-raw.json)
+- [load-tests/results/final-100-e2e-1787607937-summary.json](../load-tests/results/final-100-e2e-1787607937-summary.json)
+- [load-tests/results/final-100-e2e-1787607937-db-reconciliation.json](../load-tests/results/final-100-e2e-1787607937-db-reconciliation.json)
+- [load-tests/results/final-100-e2e-1787607937-queue-worker-reconciliation.json](../load-tests/results/final-100-e2e-1787607937-queue-worker-reconciliation.json)
+- [load-tests/results/final-100-e2e-1787607937-resource-health-snapshots.json](../load-tests/results/final-100-e2e-1787607937-resource-health-snapshots.json)
+- [load-tests/results/final-100-e2e-1787607937-report.md](../load-tests/results/final-100-e2e-1787607937-report.md)
+
 ## Environment
 
 |                    |                                                                        |

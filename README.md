@@ -247,6 +247,16 @@ read benchmark with a real `EXPLAIN ANALYZE` query plan. Every number in
 [`docs/benchmarking.md`](./docs/benchmarking.md) came from actually running these scripts; nothing
 is hardcoded or estimated (PRD §1/§17/§22).
 
+Final validation capacity claim (2026-08-24): **50 active users is the currently supported
+end-to-end claim**, reproduced across two successful corrected runs:
+`final-e2e-50-corrected-1787601679` and `final-e2e-50-corrected-rerestore-1787609192`.
+Both runs achieved `50/50` full journeys, `50/50` accepted, `50/50` leaderboard-reflected,
+zero final idempotent GET failures, and zero P1001, lock/stall, INTERNAL_ERROR, or leaked
+containers. The 100-user run `final-100-e2e-1787607937` is documented as a stretch test
+(`66/100` full journeys; all 66 admitted submissions accepted and leaderboard-reflected;
+failures occurred pre-submission due to API saturation/429s), so 100 active users is **not**
+a supported claim right now. See [`docs/final-validation.md`](./docs/final-validation.md).
+
 ## Environment variables
 
 See [`.env.example`](./.env.example) for the full list. Notable ones:

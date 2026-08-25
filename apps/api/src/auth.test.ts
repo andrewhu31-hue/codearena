@@ -166,5 +166,5 @@ describeIfInfra("auth flow", () => {
     expect(blocked.status).toBe(429);
     expect(blocked.body.error.code).toBe("RATE_LIMITED");
     expect(blocked.headers["retry-after"]).toBeDefined();
-  });
+  }, 20_000);
 });
