@@ -3,7 +3,7 @@ import type { Job } from "bullmq";
 import { Redis } from "ioredis";
 import { assertDedicatedTestDatabase, prisma } from "@codearena/database";
 import { loadJudgeWorkerEnv } from "@codearena/config";
-import { SUBMISSION_QUEUE_NAME, type SubmissionJobData } from "@codearena/shared";
+import { resolveSubmissionQueueName, type SubmissionJobData } from "@codearena/shared";
 import {
   recordFinalFailure,
   runOrphanedSubmissionReconciliationOnce,
@@ -385,12 +385,16 @@ describeIfInfra("worker reliability", () => {
     `;
 
     await connection.zadd(
-      `bull:${SUBMISSION_QUEUE_NAME}:failed`,
+      `bull:${resolveSubmissionQueueName()}:failed`,
       Date.now().toString(),
       submission.id,
     );
 
-    await runOrphanedSubmissionReconciliationOnce(connection, redisClient);
+    await runOrphanedSubmissionReconciliationOnce(
+      connection,
+      redisClient,
+      resolveSubmissionQueueName(),
+    );
 
     const updated = await prisma.submission.findUniqueOrThrow({ where: { id: submission.id } });
     expect(updated.status).toBe("FAILED");

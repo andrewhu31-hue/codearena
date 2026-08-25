@@ -331,7 +331,7 @@ async function waitForTerminalBySubmissionId(submissionId) {
   const startedAtMs = Date.now();
   while (Date.now() - startedAtMs <= POLL_TIMEOUT_MS) {
     const rows = sqlRows(
-      `select id,status,verdict,coalesce(\"runtimeMs\",0),coalesce(\"testsPassed\",0),coalesce(\"testsTotal\",0),coalesce((extract(epoch from \"terminalAt\")*1000)::bigint,0) from submissions where id = '${submissionId.replace(/'/g, "''")}'`,
+      `select id,status,verdict,coalesce("runtimeMs",0),coalesce("testsPassed",0),coalesce("testsTotal",0),coalesce((extract(epoch from "terminalAt")*1000)::bigint,0) from submissions where id = '${submissionId.replace(/'/g, "''")}'`,
     );
     if (rows.length > 0) {
       const [id, status, verdict, runtimeMs, testsPassed, testsTotal, terminalAtMs] =

@@ -56,7 +56,7 @@ function waitForTerminal(headers, submissionId) {
     let status = null;
     try {
       status = poll.json("status");
-    } catch (_err) {
+    } catch {
       status = null;
     }
 

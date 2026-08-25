@@ -129,9 +129,9 @@ async function getSubmissionRowsByIds(submissionIds, dbName) {
   const escapedIds = submissionIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",");
   const sql =
     `select id,status,verdict,` +
-    `coalesce(\"runtimeMs\",0),coalesce(\"memoryKb\",0),` +
-    `coalesce(\"testsPassed\",0),coalesce(\"testsTotal\",0),` +
-    `coalesce((extract(epoch from \"terminalAt\") * 1000)::bigint,0) ` +
+    `coalesce("runtimeMs",0),coalesce("memoryKb",0),` +
+    `coalesce("testsPassed",0),coalesce("testsTotal",0),` +
+    `coalesce((extract(epoch from "terminalAt") * 1000)::bigint,0) ` +
     `from submissions where id in (${escapedIds})`;
   const output = execFileSync(
     "docker",

@@ -3,7 +3,7 @@ import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import { assertDedicatedTestDatabase, prisma } from "@codearena/database";
 import { loadJudgeWorkerEnv } from "@codearena/config";
-import { SUBMISSION_QUEUE_NAME } from "@codearena/shared";
+import { resolveSubmissionQueueName } from "@codearena/shared";
 import { createSubmissionWorker, type SubmissionWorkerHandle } from "./worker.js";
 import { isDockerAvailable } from "./execution/dockerAvailable.js";
 
@@ -91,7 +91,7 @@ describeIfReady("submission lifecycle", () => {
   beforeAll(() => {
     const env = loadJudgeWorkerEnv();
     queueConnection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
-    queue = new Queue(SUBMISSION_QUEUE_NAME, { connection: queueConnection });
+    queue = new Queue(resolveSubmissionQueueName(), { connection: queueConnection });
     workerHandle = createSubmissionWorker(env);
   });
 

@@ -1,7 +1,7 @@
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import type { ApiEnv } from "@codearena/config";
-import { SUBMISSION_QUEUE_NAME } from "@codearena/shared";
+import { resolveSubmissionQueueName } from "@codearena/shared";
 
 export interface SubmissionQueueHandle {
   queue: Queue;
@@ -15,6 +15,6 @@ export interface SubmissionQueueHandle {
  */
 export function createSubmissionQueue(env: ApiEnv): SubmissionQueueHandle {
   const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
-  const queue = new Queue(SUBMISSION_QUEUE_NAME, { connection });
+  const queue = new Queue(resolveSubmissionQueueName(), { connection });
   return { queue, connection };
 }

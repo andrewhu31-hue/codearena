@@ -7,7 +7,7 @@ import type { Express } from "express";
 import { Redis } from "ioredis";
 import { assertDedicatedTestDatabase, prisma } from "@codearena/database";
 import { loadApiEnv } from "@codearena/config";
-import type { LeaderboardEntry } from "@codearena/shared";
+import { resolveSubmissionQueueName, type LeaderboardEntry } from "@codearena/shared";
 import { createApp } from "./app.js";
 import { createSubmissionQueue } from "./lib/queue.js";
 
@@ -26,6 +26,16 @@ const describeIfReady = canRun ? describe : describe.skip;
 
 function assertSafeCleanupTarget() {
   assertDedicatedTestDatabase(process.env.DATABASE_URL ?? "", "API e2e test cleanup");
+}
+
+function databaseNameFromUrl(databaseUrl: string | undefined): string | null {
+  if (!databaseUrl) return null;
+  try {
+    const parsed = new URL(databaseUrl);
+    return parsed.pathname.replace(/^\//, "") || null;
+  } catch {
+    return null;
+  }
 }
 
 function waitForWorkerReady(proc: ChildProcess, timeoutMs = 20_000): Promise<void> {
@@ -55,6 +65,12 @@ async function pollUntilTerminal(
   app: Express,
   token: string,
   submissionId: string,
+  diagnostics: {
+    apiDatabaseUrl: string;
+    workerDatabaseUrl: string;
+    queueName: string;
+    queueHandle: ReturnType<typeof createSubmissionQueue>;
+  },
   timeoutMs = 30_000,
 ) {
   const deadline = Date.now() + timeoutMs;
@@ -63,7 +79,35 @@ async function pollUntilTerminal(
       .get(`/api/v1/submissions/${submissionId}`)
       .set("Authorization", `Bearer ${token}`);
     if (res.body.status === "COMPLETED" || res.body.status === "FAILED") return res.body;
-    if (Date.now() > deadline) throw new Error("Timed out waiting for the submission to finish");
+    if (Date.now() > deadline) {
+      const persisted = await prisma.submission.findUnique({
+        where: { id: submissionId },
+        select: {
+          status: true,
+          verdict: true,
+          processingStartedAt: true,
+          terminalAt: true,
+          updatedAt: true,
+        },
+      });
+      const job = await diagnostics.queueHandle.queue.getJob(submissionId);
+      const queueJob = { hasJob: Boolean(job), state: job ? await job.getState() : "missing" };
+
+      const workerClaimedSubmission = Boolean(persisted?.processingStartedAt);
+      throw new Error(
+        [
+          "Timed out waiting for the submission to finish",
+          `submissionId=${submissionId}`,
+          `apiDatabaseTarget=${databaseNameFromUrl(diagnostics.apiDatabaseUrl)}`,
+          `workerDatabaseTarget=${databaseNameFromUrl(diagnostics.workerDatabaseUrl)}`,
+          `redisQueueName=${diagnostics.queueName}`,
+          `workerClaimedSubmission=${workerClaimedSubmission}`,
+          `finalPersistedStatus=${persisted?.status ?? "MISSING"}`,
+          `finalPersistedVerdict=${persisted?.verdict ?? "null"}`,
+          `queueJobState=${queueJob.state}`,
+        ].join("; "),
+      );
+    }
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
 }
@@ -107,12 +151,17 @@ describeIfReady("full end-to-end lifecycle (PRD §16)", () => {
     redis = new Redis(env.REDIS_URL);
     queueHandle = createSubmissionQueue(env);
     app = createApp(env, redis, queueHandle.queue);
+    const queueName = resolveSubmissionQueueName();
 
     const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
     workerProcess = spawn("npx", ["tsx", "../judge-worker/src/index.ts"], {
       cwd: apiRoot,
       env: {
         ...process.env,
+        DATABASE_URL: env.DATABASE_URL,
+        REDIS_URL: env.REDIS_URL,
+        TEST_DATABASE_NAME: process.env.TEST_DATABASE_NAME ?? "codearena_test",
+        SUBMISSION_QUEUE_NAME: queueName,
         WORKER_CONCURRENCY: "1",
       },
       stdio: "pipe",
@@ -201,7 +250,12 @@ describeIfReady("full end-to-end lifecycle (PRD §16)", () => {
     // The API acknowledges without waiting for judging (PRD §21).
     expect(submitRes.body.status).toBe("QUEUED");
 
-    const finalSubmission = await pollUntilTerminal(app, token, submitRes.body.id as string);
+    const finalSubmission = await pollUntilTerminal(app, token, submitRes.body.id as string, {
+      apiDatabaseUrl: loadApiEnv().DATABASE_URL,
+      workerDatabaseUrl: loadApiEnv().DATABASE_URL,
+      queueName: resolveSubmissionQueueName(),
+      queueHandle,
+    });
     expect(finalSubmission.status).toBe("COMPLETED");
     expect(finalSubmission.verdict).toBe("ACCEPTED");
 

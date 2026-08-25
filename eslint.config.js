@@ -33,6 +33,17 @@ export default tseslint.config(
     },
   },
   {
+    // Standalone Node scripts used from CLI tooling.
+    files: ["scripts/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        fetch: "readonly",
+        setTimeout: "readonly",
+      },
+    },
+  },
+  {
     // k6 scenario scripts run in k6's own JS runtime, not Node or a
     // browser — __ENV/__VU/__ITER/__VU_ITER/open are k6 runtime globals.
     files: ["load-tests/scenarios/**/*.js"],

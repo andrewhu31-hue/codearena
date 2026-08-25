@@ -57,6 +57,17 @@ const BASELINE_PROBES = [
 
 const GENERIC_WRONG_PYTHON = `import sys\n_ = sys.stdin.read()\nprint("definitely-wrong-output")\n`;
 
+function getRetryMeta(err) {
+  if (!err || typeof err !== "object") {
+    return { status: undefined, retryAfterMs: 0, cause: undefined };
+  }
+  const meta = /** @type {{ status?: unknown; retryAfterMs?: unknown; cause?: unknown }} */ (err);
+  const status = typeof meta.status === "number" ? meta.status : undefined;
+  const retryAfterMs =
+    typeof meta.retryAfterMs === "number" && meta.retryAfterMs > 0 ? meta.retryAfterMs : 0;
+  return { status, retryAfterMs, cause: meta.cause };
+}
+
 async function http(path, options = {}) {
   let res;
   let lastFetchErr = null;
@@ -99,11 +110,11 @@ async function http(path, options = {}) {
       Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
         ? Math.ceil(retryAfterSeconds * 1000)
         : 0;
-    // @ts-ignore attach status/body for caller retry logic
+    // @ts-expect-error: attach HTTP status metadata for runtime retry logic.
     err.status = res.status;
-    // @ts-ignore attach body for caller debugging
+    // @ts-expect-error: attach HTTP response body metadata for diagnostics.
     err.body = body;
-    // @ts-ignore attach server-advised retry delay for caller backoff
+    // @ts-expect-error: attach server-advised retry delay for runtime backoff.
     err.retryAfterMs = retryAfterMs;
     throw err;
   }
@@ -151,20 +162,14 @@ async function submitWithRetry(tokenPool, startIndex, problemId, probe) {
         const submissionId = await submit(tokenRecord.token, problemId, probe);
         return { submissionId, tokenRecord };
       } catch (err) {
-        // @ts-ignore dynamic error status assigned in http()
-        if (err?.status === 429) {
+        if (getRetryMeta(err).status === 429) {
           lastErr = err;
           continue;
         }
         throw err;
       }
     }
-    const retryAfterMs =
-      // @ts-ignore dynamic error retryAfterMs assigned in http()
-      typeof lastErr?.retryAfterMs === "number" && lastErr.retryAfterMs > 0
-        ? // @ts-ignore dynamic error retryAfterMs assigned in http()
-          lastErr.retryAfterMs
-        : 0;
+    const retryAfterMs = getRetryMeta(lastErr).retryAfterMs;
     const sleepMs = Math.max(SUBMIT_RETRY_SLEEP_MS, retryAfterMs);
     await new Promise((r) => setTimeout(r, sleepMs));
   }
@@ -186,15 +191,10 @@ async function getSubmissionWithRetry(token, submissionId) {
     try {
       return await getSubmission(token, submissionId);
     } catch (err) {
-      // @ts-ignore dynamic error status assigned in http()
-      if (err?.status !== 429) throw err;
+      const meta = getRetryMeta(err);
+      if (meta.status !== 429) throw err;
       lastErr = err;
-      const retryAfterMs =
-        // @ts-ignore dynamic error retryAfterMs assigned in http()
-        typeof err?.retryAfterMs === "number" && err.retryAfterMs > 0
-          ? // @ts-ignore dynamic error retryAfterMs assigned in http()
-            err.retryAfterMs
-          : 0;
+      const retryAfterMs = meta.retryAfterMs;
       const sleepMs = Math.max(POLL_RETRY_SLEEP_MS, retryAfterMs);
       await new Promise((r) => setTimeout(r, sleepMs));
     }
@@ -313,11 +313,7 @@ async function main() {
 main().catch((err) => {
   const message = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : undefined;
-  const cause =
-    err && typeof err === "object" && "cause" in err
-      ? // @ts-ignore runtime Error.cause support
-        err.cause
-      : undefined;
+  const cause = getRetryMeta(err).cause;
   console.error(`Fatal: ${message}`);
   if (stack) console.error(stack);
   if (cause) console.error("Cause:", cause);

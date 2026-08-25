@@ -84,10 +84,6 @@ function dockerComposeExec(service, shellCommand) {
   return run("docker", ["compose", "exec", "-T", service, "sh", "-lc", shellCommand]);
 }
 
-function dockerComposeExecSoft(service, shellCommand) {
-  return runSoft("docker", ["compose", "exec", "-T", service, "sh", "-lc", shellCommand]);
-}
-
 function parseDbName(databaseUrl) {
   try {
     const url = new URL(databaseUrl);
@@ -367,7 +363,7 @@ function reconcileScenarioA({
   const expectedIdemKeys = intendedUsers.map((u) => `${runTag}:${u}`);
 
   const rows = sqlRows(
-    `select id, \"userId\", status, verdict, coalesce(\"idempotencyKey\",''), coalesce(\"idempotencyScope\",''), coalesce(\"testsPassed\",0), coalesce(\"testsTotal\",0) from submissions where \"sourceCode\" like '# ${runTag}%'`,
+    `select id, "userId", status, verdict, coalesce("idempotencyKey",''), coalesce("idempotencyScope",''), coalesce("testsPassed",0), coalesce("testsTotal",0) from submissions where "sourceCode" like '# ${runTag}%'`,
     dbName,
   );
 
@@ -404,13 +400,13 @@ function reconcileScenarioA({
   const contestId = context.contestId;
   const contestProblemPoints = Number(
     sqlValue(
-      `select points from contest_problems where \"contestId\"='${contestId}' limit 1`,
+      `select points from contest_problems where "contestId"='${contestId}' limit 1`,
       dbName,
     ),
   );
 
   const scoreRows = sqlRows(
-    `select \"userId\", score, \"solvedCount\" from contest_scores where \"contestId\"='${contestId}'`,
+    `select "userId", score, "solvedCount" from contest_scores where "contestId"='${contestId}'`,
     dbName,
   );
   const scoreMap = new Map(
@@ -663,7 +659,7 @@ function reconcileScenarioB({
   const summary = JSON.parse(readFileSync(summaryPath, "utf8"));
 
   const rows = sqlRows(
-    `select id, \"userId\", status, verdict, coalesce(\"idempotencyKey\",''), \"createdAt\" from submissions where \"sourceCode\" like '# ${runTag}%' order by \"createdAt\" asc`,
+    `select id, "userId", status, verdict, coalesce("idempotencyKey",''), "createdAt" from submissions where "sourceCode" like '# ${runTag}%' order by "createdAt" asc`,
     dbName,
   );
 
@@ -680,7 +676,7 @@ function reconcileScenarioB({
   });
 
   const duplicatesByIdempotency = sqlRows(
-    `select \"idempotencyKey\", count(*) from submissions where \"sourceCode\" like '# ${runTag}%' and \"idempotencyKey\" is not null group by \"idempotencyKey\" having count(*) > 1`,
+    `select "idempotencyKey", count(*) from submissions where "sourceCode" like '# ${runTag}%' and "idempotencyKey" is not null group by "idempotencyKey" having count(*) > 1`,
     dbName,
   ).map((line) => {
     const [idempotencyKey, count] = line.split("|");
@@ -770,7 +766,7 @@ function reconcileScenarioB({
 
   const accepted = submissions.filter((s) => s.verdict === "ACCEPTED");
   const scoreRows = sqlRows(
-    `select \"userId\", score, \"solvedCount\" from contest_scores where \"contestId\"='${context.contestId}'`,
+    `select "userId", score, "solvedCount" from contest_scores where "contestId"='${context.contestId}'`,
     dbName,
   );
   const scoreMap = new Map(

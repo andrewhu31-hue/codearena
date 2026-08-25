@@ -2,7 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { Redis } from "ioredis";
 import { prisma } from "@codearena/database";
 import type { JudgeWorkerEnv } from "@codearena/config";
-import { SUBMISSION_QUEUE_NAME, type SubmissionJobData } from "@codearena/shared";
+import { resolveSubmissionQueueName, type SubmissionJobData } from "@codearena/shared";
 import { evaluateSubmission } from "./execution/evaluate.js";
 import {
   computeContestScoreSnapshot,
@@ -141,11 +141,12 @@ function extractDockerStartupMs(compilerOutput: string | null): number | null {
 
 async function resolveBullState(
   connection: Redis,
+  queueName: string,
   jobId: string,
 ): Promise<"failed" | "completed" | null> {
   const [failedScore, completedScore] = await Promise.all([
-    connection.zscore(`bull:${SUBMISSION_QUEUE_NAME}:failed`, jobId),
-    connection.zscore(`bull:${SUBMISSION_QUEUE_NAME}:completed`, jobId),
+    connection.zscore(`bull:${queueName}:failed`, jobId),
+    connection.zscore(`bull:${queueName}:completed`, jobId),
   ]);
   if (failedScore !== null) return "failed";
   if (completedScore !== null) return "completed";
@@ -155,6 +156,7 @@ async function resolveBullState(
 async function reconcileOrphanedRunningSubmissions(
   connection: Redis,
   redisClient: Redis,
+  queueName: string,
 ): Promise<void> {
   const cutoff = new Date(Date.now() - 2 * 60 * 1000);
   const running = await withDbRetry(() =>
@@ -167,7 +169,7 @@ async function reconcileOrphanedRunningSubmissions(
   );
 
   for (const submission of running) {
-    const bullState = await resolveBullState(connection, submission.id);
+    const bullState = await resolveBullState(connection, queueName, submission.id);
     if (!bullState) continue;
 
     const { count } = await withDbRetry(() =>
@@ -219,8 +221,9 @@ async function reconcileOrphanedRunningSubmissions(
 export async function runOrphanedSubmissionReconciliationOnce(
   connection: Redis,
   redisClient: Redis,
+  queueName: string,
 ): Promise<void> {
-  await reconcileOrphanedRunningSubmissions(connection, redisClient);
+  await reconcileOrphanedRunningSubmissions(connection, redisClient, queueName);
 }
 
 export async function processSubmissionJob(
@@ -558,8 +561,9 @@ export function createSubmissionWorker(env: JudgeWorkerEnv): SubmissionWorkerHan
   instrumentRedisCommandLatency(connection, "bullmq-connection", logger);
   instrumentRedisCommandLatency(redisClient, "worker-redis-client", logger);
 
+  const queueName = resolveSubmissionQueueName();
   const worker = new Worker<SubmissionJobData>(
-    SUBMISSION_QUEUE_NAME,
+    queueName,
     async (job: Job<SubmissionJobData>) => {
       await processSubmissionJob(job.data.submissionId, {
         env,
@@ -585,9 +589,11 @@ export function createSubmissionWorker(env: JudgeWorkerEnv): SubmissionWorkerHan
   });
 
   const reconciler = setInterval(() => {
-    void runOrphanedSubmissionReconciliationOnce(connection, redisClient).catch((err) => {
-      logger.error({ err }, "Failed orphaned submission reconciliation pass");
-    });
+    void runOrphanedSubmissionReconciliationOnce(connection, redisClient, queueName).catch(
+      (err) => {
+        logger.error({ err }, "Failed orphaned submission reconciliation pass");
+      },
+    );
   }, 60_000);
 
   // Keep process exit behavior predictable; the interval is background hygiene.
