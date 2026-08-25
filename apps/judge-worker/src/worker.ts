@@ -69,10 +69,7 @@ export async function withTransientTerminalWriteRetry<T>(
 
 export async function setLifecycleTimestampOnce(
   submissionId: string,
-  column:
-    | "processingStartedAt"
-    | "terminalAt"
-    | "scorePersistedAt",
+  column: "processingStartedAt" | "terminalAt" | "scorePersistedAt",
 ): Promise<void> {
   await prisma.$executeRawUnsafe(
     `UPDATE submissions SET "${column}" = COALESCE("${column}", NOW()) WHERE id = $1`,
@@ -142,7 +139,10 @@ function extractDockerStartupMs(compilerOutput: string | null): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-async function resolveBullState(connection: Redis, jobId: string): Promise<"failed" | "completed" | null> {
+async function resolveBullState(
+  connection: Redis,
+  jobId: string,
+): Promise<"failed" | "completed" | null> {
   const [failedScore, completedScore] = await Promise.all([
     connection.zscore(`bull:${SUBMISSION_QUEUE_NAME}:failed`, jobId),
     connection.zscore(`bull:${SUBMISSION_QUEUE_NAME}:completed`, jobId),
@@ -209,7 +209,10 @@ async function reconcileOrphanedRunningSubmissions(
       testsPassed: 0,
       testsTotal: submission.testsTotal,
     });
-    logger.warn({ submissionId: submission.id, bullState }, "Reconciled orphaned RUNNING submission");
+    logger.warn(
+      { submissionId: submission.id, bullState },
+      "Reconciled orphaned RUNNING submission",
+    );
   }
 }
 
@@ -262,10 +265,7 @@ export async function processSubmissionJob(
     prisma.submission.updateMany({
       where: {
         id: submissionId,
-        OR: [
-          { status: "QUEUED" },
-          { status: "RUNNING", updatedAt: { lt: runningStaleBefore } },
-        ],
+        OR: [{ status: "QUEUED" }, { status: "RUNNING", updatedAt: { lt: runningStaleBefore } }],
       },
       data: { status: "RUNNING" },
     }),
@@ -319,11 +319,11 @@ export async function processSubmissionJob(
   const contestScoreSnapshotStart = Date.now();
   const contestScoreSnapshot = submission.contestId
     ? await computeContestScoreSnapshot(submission.contestId, submission.userId, {
-      submissionId,
-      problemId: submission.problemId,
-      verdict,
-      createdAt: submission.createdAt,
-    })
+        submissionId,
+        problemId: submission.problemId,
+        verdict,
+        createdAt: submission.createdAt,
+      })
     : null;
   const contestScoreSnapshotMs = Date.now() - contestScoreSnapshotStart;
 
@@ -333,7 +333,10 @@ export async function processSubmissionJob(
     const terminalTxAttemptStartedAt = Date.now();
     return prisma.$transaction(
       async (tx) => {
-        terminalTxAcquireMs = Math.max(terminalTxAcquireMs, Date.now() - terminalTxAttemptStartedAt);
+        terminalTxAcquireMs = Math.max(
+          terminalTxAcquireMs,
+          Date.now() - terminalTxAttemptStartedAt,
+        );
         await tx.submissionResult.deleteMany({ where: { submissionId } });
         await tx.submissionResult.createMany({
           data: testResults.map((r) => ({
@@ -430,12 +433,14 @@ export async function processSubmissionJob(
 
   if (submission.contestId) {
     const recomputeStartedAt = Date.now();
-    await recomputeContestScore(redisClient, submission.contestId, submission.userId).catch((err) => {
-      logger.warn(
-        { err, submissionId, contestId: submission.contestId, userId: submission.userId },
-        "Best-effort contest score reconciliation after completion failed",
-      );
-    });
+    await recomputeContestScore(redisClient, submission.contestId, submission.userId).catch(
+      (err) => {
+        logger.warn(
+          { err, submissionId, contestId: submission.contestId, userId: submission.userId },
+          "Best-effort contest score reconciliation after completion failed",
+        );
+      },
+    );
     contestScoreRecomputeMs = Math.max(contestScoreRecomputeMs, Date.now() - recomputeStartedAt);
   }
   stageTimings.contestScoreRecomputeMs = contestScoreRecomputeMs;

@@ -14,7 +14,7 @@ const inferredPrismaPoolSize = inferPrismaPoolSize(env.DATABASE_URL);
 if (!isDockerAvailable()) {
   logger.fatal(
     "Docker is not available (`docker info` failed). The judge worker cannot evaluate " +
-    "submissions without it — see docs/judge-security.md.",
+      "submissions without it — see docs/judge-security.md.",
   );
   process.exit(1);
 }

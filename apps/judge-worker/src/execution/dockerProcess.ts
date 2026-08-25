@@ -9,10 +9,7 @@ const execFileAsync = promisify(execFile);
 const MAX_OUTPUT_BYTES = 1_000_000;
 
 export type TimeoutCategory =
-  | "none"
-  | "contestant_timeout"
-  | "startup_timeout"
-  | "teardown_timeout";
+  "none" | "contestant_timeout" | "startup_timeout" | "teardown_timeout";
 
 export type FailureCategory =
   | "none"
@@ -24,20 +21,20 @@ export type FailureCategory =
 
 export interface LifecycleEvent {
   name:
-  | "docker_spawn_requested"
-  | "child_spawned"
-  | "stdin_write_started"
-  | "stdin_write_completed"
-  | "stdin_end_called"
-  | "stdin_finish"
-  | "stdin_closed"
-  | "stdout_received"
-  | "stderr_received"
-  | "timeout_fired"
-  | "kill_requested"
-  | "kill_completed"
-  | "child_exit"
-  | "child_close";
+    | "docker_spawn_requested"
+    | "child_spawned"
+    | "stdin_write_started"
+    | "stdin_write_completed"
+    | "stdin_end_called"
+    | "stdin_finish"
+    | "stdin_closed"
+    | "stdout_received"
+    | "stderr_received"
+    | "timeout_fired"
+    | "kill_requested"
+    | "kill_completed"
+    | "child_exit"
+    | "child_close";
   atMs: number;
   sinceStartMs: number;
   detail?: string;
@@ -121,7 +118,7 @@ export async function runDockerContainer(
   let runningProbeTimer: NodeJS.Timeout | null = null;
   let stdinFinished = false;
   let contestantTimerStarted = false;
-  let finish: () => void = () => { };
+  let finish: () => void = () => {};
 
   const child = spawn("docker", args, { stdio: ["pipe", "pipe", "pipe"] });
   emit("child_spawned");
@@ -290,7 +287,7 @@ export async function runDockerContainer(
       : false;
 
   // Always clean up, whatever happened above (PRD §12 "automatic cleanup").
-  await execFileAsync("docker", ["rm", "-f", containerName]).catch(() => { });
+  await execFileAsync("docker", ["rm", "-f", containerName]).catch(() => {});
 
   const failureCategory = classifyFailure({
     timeoutCategory,

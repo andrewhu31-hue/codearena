@@ -23,8 +23,7 @@ const LEETCODE_STYLE_STARTERS: Record<Language, Partial<Record<string, string>>>
       "class Solution:\n    def twoSum(self, nums: list[int], target: int) -> list[int]:\n        pass\n",
     "reverse-string":
       "class Solution:\n    def reverseString(self, s: str) -> str:\n        pass\n",
-    "fizz-buzz":
-      "class Solution:\n    def fizzBuzz(self, n: int) -> list[str]:\n        pass\n",
+    "fizz-buzz": "class Solution:\n    def fizzBuzz(self, n: int) -> list[str]:\n        pass\n",
     "binary-search":
       "class Solution:\n    def search(self, nums: list[int], target: int) -> int:\n        pass\n",
     "longest-substring":
@@ -33,18 +32,12 @@ const LEETCODE_STYLE_STARTERS: Record<Language, Partial<Record<string, string>>>
       "class Solution:\n    def merge(self, intervals: list[list[int]]) -> list[list[int]]:\n        pass\n",
   },
   JAVASCRIPT: {
-    "two-sum":
-      "class Solution {\n  twoSum(nums, target) {\n    \n  }\n}\n",
-    "reverse-string":
-      "class Solution {\n  reverseString(s) {\n    \n  }\n}\n",
-    "fizz-buzz":
-      "class Solution {\n  fizzBuzz(n) {\n    \n  }\n}\n",
-    "binary-search":
-      "class Solution {\n  search(nums, target) {\n    \n  }\n}\n",
-    "longest-substring":
-      "class Solution {\n  lengthOfLongestSubstring(s) {\n    \n  }\n}\n",
-    "merge-intervals":
-      "class Solution {\n  merge(intervals) {\n    \n  }\n}\n",
+    "two-sum": "class Solution {\n  twoSum(nums, target) {\n    \n  }\n}\n",
+    "reverse-string": "class Solution {\n  reverseString(s) {\n    \n  }\n}\n",
+    "fizz-buzz": "class Solution {\n  fizzBuzz(n) {\n    \n  }\n}\n",
+    "binary-search": "class Solution {\n  search(nums, target) {\n    \n  }\n}\n",
+    "longest-substring": "class Solution {\n  lengthOfLongestSubstring(s) {\n    \n  }\n}\n",
+    "merge-intervals": "class Solution {\n  merge(intervals) {\n    \n  }\n}\n",
   },
   CPP: {
     "two-sum":
@@ -388,16 +381,16 @@ export function ProblemWorkspace({ slug }: { slug: string }) {
                         </p>
                         {(submissionQuery.data.runtimeMs !== null ||
                           submissionQuery.data.memoryKb !== null) && (
-                            <p className="mt-1 text-sm text-slate-500">
-                              {submissionQuery.data.runtimeMs !== null &&
-                                `${submissionQuery.data.runtimeMs}ms`}
-                              {submissionQuery.data.runtimeMs !== null &&
-                                submissionQuery.data.memoryKb !== null &&
-                                " · "}
-                              {submissionQuery.data.memoryKb !== null &&
-                                `${Math.round(submissionQuery.data.memoryKb / 1024)}MB`}
-                            </p>
-                          )}
+                          <p className="mt-1 text-sm text-slate-500">
+                            {submissionQuery.data.runtimeMs !== null &&
+                              `${submissionQuery.data.runtimeMs}ms`}
+                            {submissionQuery.data.runtimeMs !== null &&
+                              submissionQuery.data.memoryKb !== null &&
+                              " · "}
+                            {submissionQuery.data.memoryKb !== null &&
+                              `${Math.round(submissionQuery.data.memoryKb / 1024)}MB`}
+                          </p>
+                        )}
                         {submissionQuery.data.compilerOutput && (
                           <pre className="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs text-rose-300">
                             {submissionQuery.data.compilerOutput}

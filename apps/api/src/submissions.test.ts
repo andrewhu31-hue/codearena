@@ -164,7 +164,9 @@ describeIfInfra("submissions", () => {
     const uniqueSubmissionIds = new Set(responses.map((res) => res.body.id));
     expect(uniqueSubmissionIds.size).toBe(1);
 
-    const user = await prisma.user.findUniqueOrThrow({ where: { email: "idem-concurrent@example.com" } });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: "idem-concurrent@example.com" },
+    });
     const count = await prisma.submission.count({
       where: {
         userId: user.id,

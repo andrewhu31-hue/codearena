@@ -146,7 +146,9 @@ function buildStressTests(slug: string): SeedTest[] {
       ];
     }
     case "longest-substring": {
-      const longUnique = Array.from({ length: 20000 }, (_, i) => String.fromCharCode(97 + (i % 26))).join("");
+      const longUnique = Array.from({ length: 20000 }, (_, i) =>
+        String.fromCharCode(97 + (i % 26)),
+      ).join("");
       return [
         { input: "abba", expectedOutput: "2" },
         { input: "dvdf", expectedOutput: "3" },
@@ -250,7 +252,10 @@ function expandProblemTests(problem: SeedProblem): SeedProblem {
 
   const paddedHiddenTests = [...hiddenTests];
   let variantCursor = 0;
-  while (sampleTests.length + paddedHiddenTests.length < TARGET_TOTAL_TESTS && hiddenTests.length > 0) {
+  while (
+    sampleTests.length + paddedHiddenTests.length < TARGET_TOTAL_TESTS &&
+    hiddenTests.length > 0
+  ) {
     const source = hiddenTests[variantCursor % hiddenTests.length];
     const variants = buildNumericInputVariants(source);
     for (const v of variants) paddedHiddenTests.push(v);
@@ -260,7 +265,10 @@ function expandProblemTests(problem: SeedProblem): SeedProblem {
 
   // Last-resort fill to keep an equal budget across all problems.
   let copyIndex = 0;
-  while (sampleTests.length + paddedHiddenTests.length < TARGET_TOTAL_TESTS && hiddenTests.length > 0) {
+  while (
+    sampleTests.length + paddedHiddenTests.length < TARGET_TOTAL_TESTS &&
+    hiddenTests.length > 0
+  ) {
     paddedHiddenTests.push(hiddenTests[copyIndex % hiddenTests.length]);
     copyIndex += 1;
   }
@@ -553,12 +561,15 @@ async function main() {
       slug: "group-anagrams",
       title: "Group Anagrams",
       difficulty: Difficulty.MEDIUM,
-      description: "Group words that are anagrams. Sort words inside each group and groups by first word.",
+      description:
+        "Group words that are anagrams. Sort words inside each group and groups by first word.",
       inputFormat: "One line: space-separated lowercase words.",
       outputFormat: "One group per line as space-separated words.",
       constraints: "1 <= n <= 10^4",
       examples: [{ input: "eat tea tan ate nat bat", output: "ate eat tea\nbat\nnat tan" }],
-      sampleTests: [{ input: "eat tea tan ate nat bat", expectedOutput: "ate eat tea\nbat\nnat tan" }],
+      sampleTests: [
+        { input: "eat tea tan ate nat bat", expectedOutput: "ate eat tea\nbat\nnat tan" },
+      ],
       hiddenTests: [{ input: "", expectedOutput: "" }],
     },
     {
@@ -639,7 +650,8 @@ async function main() {
       slug: "climbing-stairs",
       title: "Climbing Stairs",
       difficulty: Difficulty.EASY,
-      description: "You can climb 1 or 2 steps. Return the number of distinct ways to reach step n.",
+      description:
+        "You can climb 1 or 2 steps. Return the number of distinct ways to reach step n.",
       inputFormat: "One line: integer n.",
       outputFormat: "Single integer number of ways.",
       constraints: "1 <= n <= 45",
@@ -651,7 +663,8 @@ async function main() {
       slug: "house-robber",
       title: "House Robber",
       difficulty: Difficulty.MEDIUM,
-      description: "Given non-negative house values in a line, maximize robbed sum without adjacent picks.",
+      description:
+        "Given non-negative house values in a line, maximize robbed sum without adjacent picks.",
       inputFormat: "One line: space-separated integers.",
       outputFormat: "Single integer max sum.",
       constraints: "1 <= n <= 100",
@@ -687,7 +700,8 @@ async function main() {
       slug: "unique-paths",
       title: "Unique Paths",
       difficulty: Difficulty.MEDIUM,
-      description: "Robot moves only right or down on an m x n grid. Return number of unique paths.",
+      description:
+        "Robot moves only right or down on an m x n grid. Return number of unique paths.",
       inputFormat: "One line: two integers m n.",
       outputFormat: "Single integer path count.",
       constraints: "1 <= m, n <= 100",
@@ -699,7 +713,8 @@ async function main() {
       slug: "jump-game",
       title: "Jump Game",
       difficulty: Difficulty.MEDIUM,
-      description: "Each value is max jump length from that index. Return true if last index is reachable.",
+      description:
+        "Each value is max jump length from that index. Return true if last index is reachable.",
       inputFormat: "One line: space-separated non-negative integers.",
       outputFormat: "`true` or `false`.",
       constraints: "1 <= n <= 10^4",
@@ -729,7 +744,8 @@ async function main() {
       slug: "course-schedule",
       title: "Course Schedule",
       difficulty: Difficulty.MEDIUM,
-      description: "Given number of courses and prerequisite pairs, return true if all courses can be finished.",
+      description:
+        "Given number of courses and prerequisite pairs, return true if all courses can be finished.",
       inputFormat:
         "First line: integer n (courses). Second line: integer m (pairs). Next m lines: `a b` meaning b before a.",
       outputFormat: "`true` or `false`.",
@@ -749,7 +765,9 @@ async function main() {
       constraints: "0 <= n <= 10^4",
       examples: [{ input: "2\n1 3\n6 9\n2 5", output: "1 5\n6 9" }],
       sampleTests: [{ input: "2\n1 3\n6 9\n2 5", expectedOutput: "1 5\n6 9" }],
-      hiddenTests: [{ input: "5\n1 2\n3 5\n6 7\n8 10\n12 16\n4 8", expectedOutput: "1 2\n3 10\n12 16" }],
+      hiddenTests: [
+        { input: "5\n1 2\n3 5\n6 7\n8 10\n12 16\n4 8", expectedOutput: "1 2\n3 10\n12 16" },
+      ],
     },
     {
       slug: "non-overlapping-intervals",
@@ -868,7 +886,8 @@ async function main() {
       difficulty: Difficulty.MEDIUM,
       description: "Return unique combinations whose numbers sum to target; numbers may be reused.",
       inputFormat: "First line: candidates as space-separated integers. Second line: target.",
-      outputFormat: "One combination per line sorted ascending; combinations sorted lexicographically.",
+      outputFormat:
+        "One combination per line sorted ascending; combinations sorted lexicographically.",
       constraints: "1 <= candidates.length <= 30",
       examples: [{ input: "2 3 6 7\n7", output: "2 2 3\n7" }],
       sampleTests: [{ input: "2 3 6 7\n7", expectedOutput: "2 2 3\n7" }],
@@ -878,11 +897,14 @@ async function main() {
       slug: "clone-graph",
       title: "Clone Graph",
       difficulty: Difficulty.MEDIUM,
-      description: "Deep-copy an undirected graph and return an equivalent adjacency list from node 1.",
+      description:
+        "Deep-copy an undirected graph and return an equivalent adjacency list from node 1.",
       inputFormat: "Adjacency list lines: `node: neighbors` using 1-indexed labels.",
       outputFormat: "Adjacency list of cloned graph in same format.",
       constraints: "1 <= nodes <= 100",
-      examples: [{ input: "1: 2 4\n2: 1 3\n3: 2 4\n4: 1 3", output: "1: 2 4\n2: 1 3\n3: 2 4\n4: 1 3" }],
+      examples: [
+        { input: "1: 2 4\n2: 1 3\n3: 2 4\n4: 1 3", output: "1: 2 4\n2: 1 3\n3: 2 4\n4: 1 3" },
+      ],
       sampleTests: [{ input: "1: 2\n2: 1", expectedOutput: "1: 2\n2: 1" }],
       hiddenTests: [{ input: "1:", expectedOutput: "1:" }],
     },
@@ -902,7 +924,8 @@ async function main() {
       slug: "alien-dictionary",
       title: "Alien Dictionary",
       difficulty: Difficulty.HARD,
-      description: "Given sorted words in an unknown alphabet, return one valid character ordering.",
+      description:
+        "Given sorted words in an unknown alphabet, return one valid character ordering.",
       inputFormat: "One line: space-separated words.",
       outputFormat: "String order, or empty string if invalid.",
       constraints: "1 <= words.length <= 100",
@@ -1010,7 +1033,8 @@ async function main() {
       slug: "remove-nth-node-from-end-of-list",
       title: "Remove Nth Node From End of List",
       difficulty: Difficulty.MEDIUM,
-      description: "Remove the nth node from the end of a linked list and output resulting sequence.",
+      description:
+        "Remove the nth node from the end of a linked list and output resulting sequence.",
       inputFormat: "First line: list values. Second line: integer n.",
       outputFormat: "One line: remaining values.",
       constraints: "1 <= list length <= 30",
@@ -1040,7 +1064,9 @@ async function main() {
       constraints: "1 <= r, c <= 200",
       examples: [{ input: "3 3\n1 1 1\n1 0 1\n1 1 1", output: "1 0 1\n0 0 0\n1 0 1" }],
       sampleTests: [{ input: "3 3\n1 1 1\n1 0 1\n1 1 1", expectedOutput: "1 0 1\n0 0 0\n1 0 1" }],
-      hiddenTests: [{ input: "3 4\n0 1 2 0\n3 4 5 2\n1 3 1 5", expectedOutput: "0 0 0 0\n0 4 5 0\n0 3 1 0" }],
+      hiddenTests: [
+        { input: "3 4\n0 1 2 0\n3 4 5 2\n1 3 1 5", expectedOutput: "0 0 0 0\n0 4 5 0\n0 3 1 0" },
+      ],
     },
     {
       slug: "spiral-matrix",
@@ -1052,7 +1078,12 @@ async function main() {
       constraints: "1 <= r, c <= 10",
       examples: [{ input: "3 3\n1 2 3\n4 5 6\n7 8 9", output: "1 2 3 6 9 8 7 4 5" }],
       sampleTests: [{ input: "3 3\n1 2 3\n4 5 6\n7 8 9", expectedOutput: "1 2 3 6 9 8 7 4 5" }],
-      hiddenTests: [{ input: "3 4\n1 2 3 4\n5 6 7 8\n9 10 11 12", expectedOutput: "1 2 3 4 8 12 11 10 9 5 6 7" }],
+      hiddenTests: [
+        {
+          input: "3 4\n1 2 3 4\n5 6 7 8\n9 10 11 12",
+          expectedOutput: "1 2 3 4 8 12 11 10 9 5 6 7",
+        },
+      ],
     },
     {
       slug: "rotate-image",
@@ -1166,7 +1197,8 @@ async function main() {
       slug: "serialize-and-deserialize-binary-tree",
       title: "Serialize and Deserialize Binary Tree",
       difficulty: Difficulty.HARD,
-      description: "Implement serialize/deserialize and return canonical serialized output after round-trip.",
+      description:
+        "Implement serialize/deserialize and return canonical serialized output after round-trip.",
       inputFormat: "Tree in level-order with `null` placeholders.",
       outputFormat: "Canonical serialized tree.",
       constraints: "0 <= nodes <= 10^4",
@@ -1190,7 +1222,8 @@ async function main() {
       slug: "construct-binary-tree-from-preorder-and-inorder-traversal",
       title: "Construct Binary Tree from Preorder and Inorder Traversal",
       difficulty: Difficulty.MEDIUM,
-      description: "Build a binary tree from preorder and inorder arrays and output level-order form.",
+      description:
+        "Build a binary tree from preorder and inorder arrays and output level-order form.",
       inputFormat: "First line: preorder values. Second line: inorder values.",
       outputFormat: "Level-order with `null` placeholders trimmed.",
       constraints: "1 <= nodes <= 3000",
@@ -1242,8 +1275,18 @@ async function main() {
       inputFormat: "Operations lines: `op value`, where op in {insert, search, startsWith}.",
       outputFormat: "Outputs for search/startsWith operations, one per line.",
       constraints: "1 <= operations <= 3 * 10^4",
-      examples: [{ input: "insert apple\nsearch apple\nsearch app\nstartsWith app\ninsert app\nsearch app", output: "true\nfalse\ntrue\ntrue" }],
-      sampleTests: [{ input: "insert apple\nsearch apple\nsearch app\nstartsWith app\ninsert app\nsearch app", expectedOutput: "true\nfalse\ntrue\ntrue" }],
+      examples: [
+        {
+          input: "insert apple\nsearch apple\nsearch app\nstartsWith app\ninsert app\nsearch app",
+          output: "true\nfalse\ntrue\ntrue",
+        },
+      ],
+      sampleTests: [
+        {
+          input: "insert apple\nsearch apple\nsearch app\nstartsWith app\ninsert app\nsearch app",
+          expectedOutput: "true\nfalse\ntrue\ntrue",
+        },
+      ],
       hiddenTests: [{ input: "insert a\nsearch a\nstartsWith b", expectedOutput: "true\nfalse" }],
     },
     {
@@ -1254,9 +1297,23 @@ async function main() {
       inputFormat: "Operations lines: `op value`, where op in {addWord, search}.",
       outputFormat: "Outputs for search operations, one per line.",
       constraints: "1 <= operations <= 10^4",
-      examples: [{ input: "addWord bad\naddWord dad\naddWord mad\nsearch pad\nsearch bad\nsearch .ad\nsearch b..", output: "false\ntrue\ntrue\ntrue" }],
-      sampleTests: [{ input: "addWord bad\naddWord dad\naddWord mad\nsearch pad\nsearch bad\nsearch .ad\nsearch b..", expectedOutput: "false\ntrue\ntrue\ntrue" }],
-      hiddenTests: [{ input: "addWord a\naddWord ab\nsearch a.\nsearch .", expectedOutput: "true\ntrue" }],
+      examples: [
+        {
+          input:
+            "addWord bad\naddWord dad\naddWord mad\nsearch pad\nsearch bad\nsearch .ad\nsearch b..",
+          output: "false\ntrue\ntrue\ntrue",
+        },
+      ],
+      sampleTests: [
+        {
+          input:
+            "addWord bad\naddWord dad\naddWord mad\nsearch pad\nsearch bad\nsearch .ad\nsearch b..",
+          expectedOutput: "false\ntrue\ntrue\ntrue",
+        },
+      ],
+      hiddenTests: [
+        { input: "addWord a\naddWord ab\nsearch a.\nsearch .", expectedOutput: "true\ntrue" },
+      ],
     },
   ];
 

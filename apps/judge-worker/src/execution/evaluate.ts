@@ -100,12 +100,12 @@ interface HarnessRunResult {
 interface CppHarnessSpec {
   method: string;
   kind:
-  | "vecInt_target_to_vecInt"
-  | "string_to_string"
-  | "int_to_vecString"
-  | "vecInt_target_to_int"
-  | "string_to_int"
-  | "intervals_to_intervals";
+    | "vecInt_target_to_vecInt"
+    | "string_to_string"
+    | "int_to_vecString"
+    | "vecInt_target_to_int"
+    | "string_to_int"
+    | "intervals_to_intervals";
 }
 
 const CPP_HARNESS_BY_SLUG: Record<string, CppHarnessSpec> = {
@@ -332,16 +332,11 @@ async function runOneTestCase(
     command: config.runCommand,
   });
 
-  const result = await runDockerContainer(
-    args,
-    name,
-    testCase.input,
-    {
-      contestantTimeoutMs: input.timeLimitMs,
-      startupTimeoutMs: RUN_STARTUP_TIMEOUT_MS,
-      teardownTimeoutMs: RUN_TEARDOWN_TIMEOUT_MS,
-    },
-  );
+  const result = await runDockerContainer(args, name, testCase.input, {
+    contestantTimeoutMs: input.timeLimitMs,
+    startupTimeoutMs: RUN_STARTUP_TIMEOUT_MS,
+    teardownTimeoutMs: RUN_TEARDOWN_TIMEOUT_MS,
+  });
 
   const base = {
     testCaseId: testCase.id,
@@ -355,7 +350,12 @@ async function runOneTestCase(
     return { ...base, passed: false, verdict: "TIME_LIMIT_EXCEEDED" };
   }
   if (timeoutVerdict === "INTERNAL_ERROR") {
-    return { ...base, passed: false, verdict: "INTERNAL_ERROR", timeoutCategory: result.timeoutCategory };
+    return {
+      ...base,
+      passed: false,
+      verdict: "INTERNAL_ERROR",
+      timeoutCategory: result.timeoutCategory,
+    };
   }
   if (result.infrastructureError) {
     return { ...base, passed: false, verdict: "INTERNAL_ERROR" };

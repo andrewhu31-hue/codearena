@@ -123,7 +123,9 @@ export async function createSubmission(
   }
 
   const idempotencyKey = options?.idempotencyKey?.trim();
-  const idempotencyScope = input.contestId ? `contest:${input.contestId}` : `practice:${input.problemId}`;
+  const idempotencyScope = input.contestId
+    ? `contest:${input.contestId}`
+    : `practice:${input.problemId}`;
 
   if (idempotencyKey) {
     const lookupStartedAt = Date.now();

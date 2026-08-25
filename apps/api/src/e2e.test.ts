@@ -58,7 +58,7 @@ async function pollUntilTerminal(
   timeoutMs = 30_000,
 ) {
   const deadline = Date.now() + timeoutMs;
-  for (; ;) {
+  for (;;) {
     const res = await request(app)
       .get(`/api/v1/submissions/${submissionId}`)
       .set("Authorization", `Bearer ${token}`);
@@ -75,7 +75,7 @@ async function pollForLeaderboardEntry(
   timeoutMs = 10_000,
 ): Promise<LeaderboardEntry> {
   const deadline = Date.now() + timeoutMs;
-  for (; ;) {
+  for (;;) {
     const res = await request(app).get(`/api/v1/contests/${contestId}/leaderboard`);
     const entry = (res.body.entries as LeaderboardEntry[] | undefined)?.find(
       (e) => e.userId === userId,

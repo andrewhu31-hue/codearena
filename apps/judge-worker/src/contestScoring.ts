@@ -62,14 +62,14 @@ export async function computeContestScoreSnapshot(
     : submissions;
   const withPending = pending
     ? [
-      ...filtered,
-      {
-        id: pending.submissionId,
-        problemId: pending.problemId,
-        verdict: pending.verdict,
-        createdAt: pending.createdAt,
-      },
-    ]
+        ...filtered,
+        {
+          id: pending.submissionId,
+          problemId: pending.problemId,
+          verdict: pending.verdict,
+          createdAt: pending.createdAt,
+        },
+      ]
     : filtered;
 
   return computeContestScore(contestProblems, withPending, contest.startTime);
@@ -114,27 +114,34 @@ export async function recomputeContestScore(
 ): Promise<void> {
   const result = await computeContestScoreSnapshot(contestId, userId);
 
-  await withBoundedRetry(async () => {
-    await prisma.contestScore.upsert({
-      where: { contestId_userId: { contestId, userId } },
-      update: { score: result.score, solvedCount: result.solvedCount, penaltyMs: result.penaltyMs },
-      create: {
-        contestId,
-        userId,
-        score: result.score,
-        solvedCount: result.solvedCount,
-        penaltyMs: result.penaltyMs,
-      },
-    });
-  }, {
-    maxAttempts: SCORE_WRITE_RETRY_ATTEMPTS,
-    baseDelayMs: SCORE_WRITE_RETRY_BASE_DELAY_MS,
-    maxDelayMs: SCORE_WRITE_RETRY_MAX_DELAY_MS,
-    shouldRetry: isTransientScoreWriteError,
-    onRetry: ({ err, attempt, backoffMs }) => {
-      logger.warn({ err, attempt, delayMs: backoffMs }, "Retrying transient score write failure");
+  await withBoundedRetry(
+    async () => {
+      await prisma.contestScore.upsert({
+        where: { contestId_userId: { contestId, userId } },
+        update: {
+          score: result.score,
+          solvedCount: result.solvedCount,
+          penaltyMs: result.penaltyMs,
+        },
+        create: {
+          contestId,
+          userId,
+          score: result.score,
+          solvedCount: result.solvedCount,
+          penaltyMs: result.penaltyMs,
+        },
+      });
     },
-  });
+    {
+      maxAttempts: SCORE_WRITE_RETRY_ATTEMPTS,
+      baseDelayMs: SCORE_WRITE_RETRY_BASE_DELAY_MS,
+      maxDelayMs: SCORE_WRITE_RETRY_MAX_DELAY_MS,
+      shouldRetry: isTransientScoreWriteError,
+      onRetry: ({ err, attempt, backoffMs }) => {
+        logger.warn({ err, attempt, delayMs: backoffMs }, "Retrying transient score write failure");
+      },
+    },
+  );
 
   await publishContestScoreCache(redis, contestId, userId, result);
 }

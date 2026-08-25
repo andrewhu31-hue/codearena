@@ -31,109 +31,109 @@ const leaderboardMissCount = new Counter("leaderboard_miss_after_accept");
 const ECHO_PYTHON = `import sys\nline = sys.stdin.readline()\nif line.endswith("\\n"):\n    line = line[:-1]\nsys.stdout.write(line)\n`;
 
 export const options = {
-    scenarios: {
-        active_competition: {
-            executor: "ramping-vus",
-            startVUs: 0,
-            stages: [
-                { duration: "3s", target: VUS },
-                { duration: DURATION, target: VUS },
-                { duration: "4s", target: 0 },
-            ],
-            gracefulRampDown: "20s",
-            gracefulStop: "20s",
-        },
+  scenarios: {
+    active_competition: {
+      executor: "ramping-vus",
+      startVUs: 0,
+      stages: [
+        { duration: "3s", target: VUS },
+        { duration: DURATION, target: VUS },
+        { duration: "4s", target: 0 },
+      ],
+      gracefulRampDown: "20s",
+      gracefulStop: "20s",
     },
-    thresholds: {
-        http_req_failed: ["rate<0.05"],
-        "checks{check:contest detail 200}": ["rate>0.99"],
-        "checks{check:problem detail 200}": ["rate>0.99"],
-        "checks{check:submission queued (201)}": ["rate>0.99"],
-        "checks{check:submission reached terminal state}": ["rate>0.90"],
-        "checks{check:leaderboard 200}": ["rate>0.99"],
-        "checks{check:accepted submission}": ["rate>0.90"],
-        "checks{check:leaderboard reflects accepted user}": ["rate>0.80"],
-    },
+  },
+  thresholds: {
+    http_req_failed: ["rate<0.05"],
+    "checks{check:contest detail 200}": ["rate>0.99"],
+    "checks{check:problem detail 200}": ["rate>0.99"],
+    "checks{check:submission queued (201)}": ["rate>0.99"],
+    "checks{check:submission reached terminal state}": ["rate>0.90"],
+    "checks{check:leaderboard 200}": ["rate>0.99"],
+    "checks{check:accepted submission}": ["rate>0.90"],
+    "checks{check:leaderboard reflects accepted user}": ["rate>0.80"],
+  },
 };
 
 function waitForTerminalSubmission(headers, submissionId) {
-    const start = Date.now();
-    for (let attempt = 0; attempt < 120; attempt++) {
-        sleep(0.5);
-        const pollRes = http.get(`${BASE_URL}/api/v1/submissions/${submissionId}`, { headers });
-        const status = pollRes.json("status");
-        if (status === "COMPLETED" || status === "FAILED") {
-            judgeDurationMs.add(Date.now() - start);
-            return pollRes;
-        }
+  const start = Date.now();
+  for (let attempt = 0; attempt < 120; attempt++) {
+    sleep(0.5);
+    const pollRes = http.get(`${BASE_URL}/api/v1/submissions/${submissionId}`, { headers });
+    const status = pollRes.json("status");
+    if (status === "COMPLETED" || status === "FAILED") {
+      judgeDurationMs.add(Date.now() - start);
+      return pollRes;
     }
-    return null;
+  }
+  return null;
 }
 
 function waitForLeaderboardReflection(contestId, expectedUserId) {
-    const start = Date.now();
-    for (let attempt = 0; attempt < 10; attempt++) {
-        const lbRes = http.get(`${BASE_URL}/api/v1/contests/${contestId}/leaderboard`);
-        const ok = check(lbRes, { "leaderboard 200": (r) => r.status === 200 });
-        if (ok) {
-            const entries = lbRes.json("entries") || [];
-            if (entries.some((entry) => entry.userId === expectedUserId)) {
-                leaderboardUpdateLagMs.add(Date.now() - start);
-                return true;
-            }
-        }
-        sleep(0.5);
+  const start = Date.now();
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const lbRes = http.get(`${BASE_URL}/api/v1/contests/${contestId}/leaderboard`);
+    const ok = check(lbRes, { "leaderboard 200": (r) => r.status === 200 });
+    if (ok) {
+      const entries = lbRes.json("entries") || [];
+      if (entries.some((entry) => entry.userId === expectedUserId)) {
+        leaderboardUpdateLagMs.add(Date.now() - start);
+        return true;
+      }
     }
-    return false;
+    sleep(0.5);
+  }
+  return false;
 }
 
 export default function () {
-    const user = users[__VU % users.length];
-    const headers = { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" };
+  const user = users[__VU % users.length];
+  const headers = { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" };
 
-    const contestRes = http.get(`${BASE_URL}/api/v1/contests/${context.contestId}`, { headers });
-    check(contestRes, { "contest detail 200": (r) => r.status === 200 });
+  const contestRes = http.get(`${BASE_URL}/api/v1/contests/${context.contestId}`, { headers });
+  check(contestRes, { "contest detail 200": (r) => r.status === 200 });
 
-    const problemRes = http.get(`${BASE_URL}/api/v1/problems/${context.problemSlug}`);
-    check(problemRes, { "problem detail 200": (r) => r.status === 200 });
+  const problemRes = http.get(`${BASE_URL}/api/v1/problems/${context.problemSlug}`);
+  check(problemRes, { "problem detail 200": (r) => r.status === 200 });
 
-    // Simulate that not every page visit turns into an immediate submission.
-    if (Math.random() > SUBMISSION_PROBABILITY) {
-        sleep(0.8 + Math.random() * 1.4);
-        return;
-    }
+  // Simulate that not every page visit turns into an immediate submission.
+  if (Math.random() > SUBMISSION_PROBABILITY) {
+    sleep(0.8 + Math.random() * 1.4);
+    return;
+  }
 
-    const submitRes = http.post(
-        `${BASE_URL}/api/v1/submissions`,
-        JSON.stringify({
-            contestId: context.contestId,
-            problemId: context.problemId,
-            language: "PYTHON",
-            sourceCode: ECHO_PYTHON,
-        }),
-        { headers },
-    );
-    const queued = check(submitRes, { "submission queued (201)": (r) => r.status === 201 });
-    if (!queued) return;
+  const submitRes = http.post(
+    `${BASE_URL}/api/v1/submissions`,
+    JSON.stringify({
+      contestId: context.contestId,
+      problemId: context.problemId,
+      language: "PYTHON",
+      sourceCode: ECHO_PYTHON,
+    }),
+    { headers },
+  );
+  const queued = check(submitRes, { "submission queued (201)": (r) => r.status === 201 });
+  if (!queued) return;
 
-    const submissionId = submitRes.json("id");
-    const finalRes = waitForTerminalSubmission(headers, submissionId);
-    const terminal = Boolean(finalRes);
-    check(terminal, { "submission reached terminal state": (v) => v === true });
-    if (!terminal) return;
-    terminalCount.add(1);
+  const submissionId = submitRes.json("id");
+  const finalRes = waitForTerminalSubmission(headers, submissionId);
+  const terminal = Boolean(finalRes);
+  check(terminal, { "submission reached terminal state": (v) => v === true });
+  if (!terminal) return;
+  terminalCount.add(1);
 
-    const verdict = finalRes.json("verdict");
-    const accepted = check(finalRes, { "accepted submission": () => verdict === "ACCEPTED" });
-    if (!accepted) return;
+  const verdict = finalRes.json("verdict");
+  const accepted = check(finalRes, { "accepted submission": () => verdict === "ACCEPTED" });
+  if (!accepted) return;
 
-    acceptedCount.add(1);
-    const reflected = waitForLeaderboardReflection(context.contestId, user.userId);
-    if (reflected) {
-        leaderboardReflectedCount.add(1);
-        check(reflected, { "leaderboard reflects accepted user": (v) => v === true });
-    } else {
-        leaderboardMissCount.add(1);
-        check(reflected, { "leaderboard reflects accepted user": (v) => v === true });
-    }
+  acceptedCount.add(1);
+  const reflected = waitForLeaderboardReflection(context.contestId, user.userId);
+  if (reflected) {
+    leaderboardReflectedCount.add(1);
+    check(reflected, { "leaderboard reflects accepted user": (v) => v === true });
+  } else {
+    leaderboardMissCount.add(1);
+    check(reflected, { "leaderboard reflects accepted user": (v) => v === true });
+  }
 }

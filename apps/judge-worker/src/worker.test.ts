@@ -25,12 +25,15 @@ const canRun = hasTestInfra && isDockerAvailable();
 const describeIfReady = canRun ? describe : describe.skip;
 
 function assertSafeCleanupTarget() {
-  assertDedicatedTestDatabase(process.env.DATABASE_URL ?? "", "Judge worker lifecycle test cleanup");
+  assertDedicatedTestDatabase(
+    process.env.DATABASE_URL ?? "",
+    "Judge worker lifecycle test cleanup",
+  );
 }
 
 async function waitForTerminalStatus(submissionId: string, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
-  for (; ;) {
+  for (;;) {
     const submission = await prisma.submission.findUniqueOrThrow({ where: { id: submissionId } });
     if (submission.status === "COMPLETED" || submission.status === "FAILED") return submission;
     if (Date.now() > deadline) throw new Error("Timed out waiting for submission to finish");
@@ -40,7 +43,7 @@ async function waitForTerminalStatus(submissionId: string, timeoutMs = 30_000) {
 
 async function waitForContestScore(contestId: string, userId: string, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
-  for (; ;) {
+  for (;;) {
     const score = await prisma.contestScore.findUnique({
       where: { contestId_userId: { contestId, userId } },
     });

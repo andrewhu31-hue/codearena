@@ -264,7 +264,7 @@ See [`.env.example`](./.env.example) for the full list. Notable ones:
 | Variable                                   | Purpose                                                                                                 |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                             | Postgres connection string                                                                              |
-| `POSTGRES_PORT`                            | Host port published by the Postgres container (default `5433`, container still listens on `5432`)     |
+| `POSTGRES_PORT`                            | Host port published by the Postgres container (default `5433`, container still listens on `5432`)       |
 | `REDIS_URL`                                | Redis connection string                                                                                 |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Must be ≥32 characters; generate real ones with `openssl rand -base64 48` for anything beyond local dev |
 | `ACCESS_TOKEN_TTL_SECONDS`                 | Access token lifetime (default 900s)                                                                    |
