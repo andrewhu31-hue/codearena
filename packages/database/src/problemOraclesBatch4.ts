@@ -89,8 +89,16 @@ export const BATCH4_ADDITIONAL_INPUTS: Record<Batch4Slug, string[]> = {
   "binary-tree-maximum-path-sum": ["1 -2 3", "-3", "-1 -2 null", "1 1 1 1 1 1 1", "2 -1"],
   "clone-graph": [
     "1: 2 3\n2: 1 3\n3: 1 2",
-    "1:\n2:",
-    "1: 2\n2: 1\n3: 4\n4: 3",
+    // Every input here must describe a single connected graph: the real
+    // Node* cloneGraph(Node* node) signature can only ever clone whatever
+    // is reachable from the one given start node, so a disconnected graph
+    // (e.g. two isolated components) is not representable by that method
+    // at all, regardless of which node is passed in. The two entries this
+    // replaced ("1:\n2:" and a two-component 4-node graph) were originally
+    // added to exercise "disconnected graph" coverage for the oracle only,
+    // before the C++ contract used the real single-node signature.
+    "1: 2 4\n2: 1 3\n3: 2 4\n4: 1 3",
+    "1: 2 3\n2: 1\n3: 1 4\n4: 3 5\n5: 4",
     "1: 2\n2: 1 3\n3: 2",
     "1: 2 3 4\n2: 1\n3: 1\n4: 1",
   ],

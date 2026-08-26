@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { CANONICAL_75_SLUGS } from "@codearena/shared";
 import { BATCH1_SIMPLE_SLUGS } from "../src/problemOracles.js";
 import { BATCH2_SLUGS } from "../src/problemOraclesBatch2.js";
 import { BATCH3_SLUGS } from "../src/problemOraclesBatch3.js";
@@ -13,83 +14,10 @@ const MIN_UNIQUE_PAIRS = 7;
 const EXPECTED_SLUG_COUNT = 25;
 const TOTAL_CATALOG_SIZE = 75;
 
-const ALL_75_SLUGS = [
-  "add-and-search-word-data-structure-design",
-  "alien-dictionary",
-  "best-time-to-buy-and-sell-stock",
-  "binary-search",
-  "binary-tree-level-order-traversal",
-  "binary-tree-maximum-path-sum",
-  "climbing-stairs",
-  "clone-graph",
-  "coin-change",
-  "combination-sum",
-  "construct-binary-tree-from-preorder-and-inorder-traversal",
-  "container-with-most-water",
-  "contains-duplicate",
-  "counting-bits",
-  "course-schedule",
-  "decode-ways",
-  "encode-and-decode-strings",
-  "find-minimum-in-rotated-sorted-array",
-  "fizz-buzz",
-  "graph-valid-tree",
-  "group-anagrams",
-  "house-robber",
-  "house-robber-ii",
-  "implement-trie-prefix-tree",
-  "insert-interval",
-  "invert-binary-tree",
-  "jump-game",
-  "kth-smallest-element-in-a-bst",
-  "linked-list-cycle",
-  "longest-common-subsequence",
-  "longest-consecutive-sequence",
-  "longest-increasing-subsequence",
-  "longest-repeating-character-replacement",
-  "longest-substring",
-  "lowest-common-ancestor-of-a-binary-search-tree",
-  "maximum-depth-of-binary-tree",
-  "maximum-product-subarray",
-  "maximum-subarray",
-  "meeting-rooms",
-  "meeting-rooms-ii",
-  "merge-intervals",
-  "merge-k-sorted-lists",
-  "merge-two-sorted-lists",
-  "minimum-window-substring",
-  "missing-number",
-  "non-overlapping-intervals",
-  "number-of-1-bits",
-  "number-of-connected-components-in-an-undirected-graph",
-  "number-of-islands",
-  "pacific-atlantic-water-flow",
-  "palindromic-substrings",
-  "product-of-array-except-self",
-  "remove-nth-node-from-end-of-list",
-  "reorder-list",
-  "reverse-bits",
-  "reverse-linked-list",
-  "reverse-string",
-  "rotate-image",
-  "same-tree",
-  "search-in-rotated-sorted-array",
-  "serialize-and-deserialize-binary-tree",
-  "set-matrix-zeroes",
-  "spiral-matrix",
-  "subtree-of-another-tree",
-  "sum-of-two-integers",
-  "three-sum",
-  "top-k-frequent-elements",
-  "two-sum",
-  "unique-paths",
-  "valid-anagram",
-  "valid-palindrome",
-  "valid-parentheses",
-  "validate-binary-search-tree",
-  "word-break",
-  "word-search",
-] as const;
+// The canonical 75-slug manifest lives in packages/shared so both the
+// oracle/seed validation here and the C++ contract registry validation
+// compare against the exact same source of truth.
+const ALL_75_SLUGS = CANONICAL_75_SLUGS;
 
 const KNOWN_CASES: Array<{ slug: string; input: string; expectedOutput: string }> = [
   {
@@ -193,7 +121,7 @@ function main() {
   // Union of all four batches equals exactly the 75 seeded problems.
   const unionAll = new Set<string>([...priorSlugs, ...BATCH4_SLUGS]);
   assert.equal(unionAll.size, TOTAL_CATALOG_SIZE, "union of all batches must total 75 slugs");
-  const catalogSet = new Set(ALL_75_SLUGS);
+  const catalogSet = new Set<string>(ALL_75_SLUGS);
   assert.equal(catalogSet.size, TOTAL_CATALOG_SIZE, "reference catalog must list 75 unique slugs");
   for (const slug of unionAll) {
     assert.ok(catalogSet.has(slug), `${slug} is not part of the reference 75-slug catalog`);

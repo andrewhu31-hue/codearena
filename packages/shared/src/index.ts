@@ -7,3 +7,4 @@ export * from "./contests.js";
 export * from "./leaderboard.js";
 export * from "./events.js";
 export * from "./scoring.js";
+export * from "./cpp/index.js";

@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Language, SubmissionStatus } from "@codearena/shared";
+import {
+  getCppContract,
+  renderCppStarterTemplate,
+  CPP_STANDALONE_FALLBACK_TEMPLATE,
+} from "@codearena/shared";
 import { ApiRequestError, problemsApi, submissionsApi } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { useSubmissionRealtime } from "@/lib/realtime";
@@ -14,10 +19,17 @@ import { CodeEditor } from "../../components/CodeEditor";
 const STARTER_TEMPLATES: Record<Language, string> = {
   PYTHON: "class Solution:\n    def solve(self, input: str):\n        pass\n",
   JAVASCRIPT: "class Solution {\n  solve(input) {\n    \n  }\n}\n",
-  CPP: "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    void solve() {\n        \n    }\n};\n",
+  // A slug with no registered class-method contract has no adapter to
+  // generate a judge harness with, so the CPP fallback guides the
+  // contestant toward a standalone program (their own main()) instead of
+  // a class stub that would only fail to link — see getStarterTemplate.
+  CPP: CPP_STANDALONE_FALLBACK_TEMPLATE,
 };
 
-const LEETCODE_STYLE_STARTERS: Record<Language, Partial<Record<string, string>>> = {
+// CPP is deliberately absent here — its templates are generated from the
+// shared contract registry (see getStarterTemplate) so the displayed
+// template and the judge harness can never drift apart.
+const LEETCODE_STYLE_STARTERS: Record<"PYTHON" | "JAVASCRIPT", Partial<Record<string, string>>> = {
   PYTHON: {
     "two-sum":
       "class Solution:\n    def twoSum(self, nums: list[int], target: int) -> list[int]:\n        pass\n",
@@ -38,20 +50,6 @@ const LEETCODE_STYLE_STARTERS: Record<Language, Partial<Record<string, string>>>
     "binary-search": "class Solution {\n  search(nums, target) {\n    \n  }\n}\n",
     "longest-substring": "class Solution {\n  lengthOfLongestSubstring(s) {\n    \n  }\n}\n",
     "merge-intervals": "class Solution {\n  merge(intervals) {\n    \n  }\n}\n",
-  },
-  CPP: {
-    "two-sum":
-      "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        \n    }\n};\n",
-    "reverse-string":
-      "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    string reverseString(string s) {\n        \n    }\n};\n",
-    "fizz-buzz":
-      "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<string> fizzBuzz(int n) {\n        \n    }\n};\n",
-    "binary-search":
-      "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    int search(vector<int>& nums, int target) {\n        \n    }\n};\n",
-    "longest-substring":
-      "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    int lengthOfLongestSubstring(string s) {\n        \n    }\n};\n",
-    "merge-intervals":
-      "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<vector<int>> merge(vector<vector<int>>& intervals) {\n        \n    }\n};\n",
   },
 };
 
@@ -78,7 +76,10 @@ function slugToSnakeCase(slug: string): string {
   return normalized || "solve";
 }
 
-function buildDefaultLeetCodeTemplate(language: Language, problemSlug: string): string {
+function buildDefaultLeetCodeTemplate(
+  language: "PYTHON" | "JAVASCRIPT",
+  problemSlug: string,
+): string {
   const camel = slugToCamelCase(problemSlug);
   const snake = slugToSnakeCase(problemSlug);
 
@@ -86,69 +87,22 @@ function buildDefaultLeetCodeTemplate(language: Language, problemSlug: string): 
     return `class Solution:\n    def ${snake}(self, *args):\n        pass\n`;
   }
 
-  if (language === "JAVASCRIPT") {
-    return `class Solution {\n  ${camel}(...args) {\n    \n  }\n}\n`;
-  }
-
-  let returnType = "int";
-  let args = "vector<int>& nums";
-  let fallbackReturn = "0";
-
-  if (
-    problemSlug.includes("valid") ||
-    problemSlug.includes("cycle") ||
-    problemSlug.includes("word-break") ||
-    problemSlug.includes("jump-game") ||
-    problemSlug.includes("course-schedule") ||
-    problemSlug.includes("meeting-rooms") ||
-    problemSlug.includes("graph-valid-tree") ||
-    problemSlug.includes("same-tree") ||
-    problemSlug.includes("subtree") ||
-    problemSlug.includes("search-word")
-  ) {
-    returnType = "bool";
-    args = "vector<int>& nums";
-    fallbackReturn = "false";
-  } else if (
-    problemSlug.includes("merge") ||
-    problemSlug.includes("interval") ||
-    problemSlug.includes("combination-sum") ||
-    problemSlug.includes("pacific-atlantic") ||
-    problemSlug.includes("level-order")
-  ) {
-    returnType = "vector<vector<int>>";
-    args = "vector<vector<int>>& grid";
-    fallbackReturn = "{}";
-  } else if (
-    problemSlug.includes("top-k") ||
-    problemSlug.includes("two-sum") ||
-    problemSlug.includes("counting-bits") ||
-    problemSlug.includes("spiral-matrix")
-  ) {
-    returnType = "vector<int>";
-    args = "vector<int>& nums";
-    fallbackReturn = "{}";
-  } else if (
-    problemSlug.includes("window") ||
-    problemSlug.includes("dictionary") ||
-    problemSlug.includes("reverse-string") ||
-    problemSlug.includes("encode")
-  ) {
-    returnType = "string";
-    args = "string s";
-    fallbackReturn = '""';
-  }
-
-  return `#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    ${returnType} ${camel}(${args}) {\n        return ${fallbackReturn};\n    }\n};\n`;
+  return `class Solution {\n  ${camel}(...args) {\n    \n  }\n}\n`;
 }
 
 function getStarterTemplate(language: Language, problemSlug: string): string {
+  if (language === "CPP") {
+    // Driven entirely by the shared contract registry: the same source the
+    // judge-worker harness generator reads, so template and harness can
+    // never disagree. A slug with no registered contract falls back to a
+    // standalone-program template (see STARTER_TEMPLATES.CPP) since there
+    // is no adapter to generate a class harness with.
+    const contract = getCppContract(problemSlug);
+    return contract ? renderCppStarterTemplate(contract) : STARTER_TEMPLATES.CPP;
+  }
+
   const languageTemplates = LEETCODE_STYLE_STARTERS[language];
-  return (
-    languageTemplates[problemSlug] ??
-    buildDefaultLeetCodeTemplate(language, problemSlug) ??
-    STARTER_TEMPLATES[language]
-  );
+  return languageTemplates[problemSlug] ?? buildDefaultLeetCodeTemplate(language, problemSlug);
 }
 
 const VERDICT_STYLES: Record<string, string> = {
