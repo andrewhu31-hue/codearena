@@ -11,3 +11,4 @@ packages/database/generated/
 *.tsbuildinfo
 .judge-workspaces/
 load-tests/results/
+backups/

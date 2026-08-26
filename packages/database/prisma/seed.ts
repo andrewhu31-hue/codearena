@@ -1,5 +1,6 @@
 import { PrismaClient, Role, Difficulty, Language } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { computeBatch1AdditionalTests } from "../src/problemOracles.js";
 
 const prisma = new PrismaClient();
 
@@ -248,7 +249,11 @@ function buildNumericInputVariants(test: SeedTest): SeedTest[] {
 
 function expandProblemTests(problem: SeedProblem): SeedProblem {
   const sampleTests = dedupeTests(problem.sampleTests);
-  const hiddenTests = dedupeTests([...problem.hiddenTests, ...buildStressTests(problem.slug)]);
+  const hiddenTests = dedupeTests([
+    ...problem.hiddenTests,
+    ...computeBatch1AdditionalTests(problem.slug),
+    ...buildStressTests(problem.slug),
+  ]);
 
   const paddedHiddenTests = [...hiddenTests];
   let variantCursor = 0;
