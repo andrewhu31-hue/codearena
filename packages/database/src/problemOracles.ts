@@ -3,7 +3,7 @@ export interface SeedTestInput {
   expectedOutput: string;
 }
 
-interface TreeNode {
+export interface TreeNode {
   val: number;
   left: TreeNode | null;
   right: TreeNode | null;
@@ -89,7 +89,7 @@ export function parseNumberTokens(line: string): number[] {
   return tokenize(line).map((t) => Number(t));
 }
 
-function parseLevelOrderTree(line: string): TreeNode | null {
+export function parseLevelOrderTree(line: string): TreeNode | null {
   const raw = tokenize(line);
   if (raw.length === 0) return null;
   const values = raw.map((t) => (t === "null" ? null : Number(t)));
@@ -121,7 +121,7 @@ function parseLevelOrderTree(line: string): TreeNode | null {
   return root;
 }
 
-function treeEqual(a: TreeNode | null, b: TreeNode | null): boolean {
+export function treeEqual(a: TreeNode | null, b: TreeNode | null): boolean {
   if (a == null || b == null) return a === b;
   return a.val === b.val && treeEqual(a.left, b.left) && treeEqual(a.right, b.right);
 }

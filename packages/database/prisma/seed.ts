@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { computeBatch1AdditionalTests } from "../src/problemOracles.js";
 import { computeBatch2AdditionalTests } from "../src/problemOraclesBatch2.js";
 import { computeBatch3AdditionalTests } from "../src/problemOraclesBatch3.js";
+import { computeBatch4AdditionalTests } from "../src/problemOraclesBatch4.js";
 
 const prisma = new PrismaClient();
 
@@ -256,6 +257,7 @@ function expandProblemTests(problem: SeedProblem): SeedProblem {
     ...computeBatch1AdditionalTests(problem.slug),
     ...computeBatch2AdditionalTests(problem.slug),
     ...computeBatch3AdditionalTests(problem.slug),
+    ...computeBatch4AdditionalTests(problem.slug),
     ...buildStressTests(problem.slug),
   ]);
 
