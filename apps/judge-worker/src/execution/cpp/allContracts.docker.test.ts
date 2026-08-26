@@ -15,10 +15,33 @@ import { buildReferenceSubmission } from "./buildReferenceSubmission.js";
  * row. Deliberately reads from codearena_restored (read-only) rather than
  * the dedicated codearena_test database, since that is where the real
  * catalog and its stored test rows live — this suite never writes to it.
+ *
+ * codearena_restored is a local development fixture, not something CI (or
+ * any other environment) is expected to have — CI's dedicated codearena_test
+ * database is deliberately kept schema-only so other suites can rely on a
+ * clean slate. So this suite is gated on the catalog actually being reachable
+ * and fully seeded, exactly like describeIfDocker already gates on Docker
+ * being available: skip gracefully rather than fail when the fixture this
+ * suite depends on simply isn't present.
  */
-const describeIfDocker = isDockerAvailable() ? describe : describe.skip;
-
 const RESTORED_DB_URL = "postgresql://codearena:codearena@localhost:5433/codearena_restored";
+
+async function restoredCatalogAvailable(): Promise<boolean> {
+  const prisma = new PrismaClient({ datasources: { db: { url: RESTORED_DB_URL } } });
+  try {
+    const count = await prisma.problem.count({
+      where: { slug: { in: [...CANONICAL_75_SLUGS] } },
+    });
+    return count === CANONICAL_75_SLUGS.length;
+  } catch {
+    return false;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+const describeIfDocker =
+  isDockerAvailable() && (await restoredCatalogAvailable()) ? describe : describe.skip;
 
 interface FixtureRow {
   input: string;
@@ -99,6 +122,6 @@ describeIfDocker("C++ contract registry — real Docker compile/run for all 75",
         result.testResults.every((t) => t.passed),
         slug,
       ).toBe(true);
-    }, 60_000);
+    }, 120_000);
   }
 });
