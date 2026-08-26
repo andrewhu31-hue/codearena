@@ -12,8 +12,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx scripts/run-oracle-batch1-tests.ts",
-    "test:coverage": "tsx scripts/run-oracle-batch1-tests.ts"
+    "test": "tsx scripts/run-oracle-batch1-tests.ts && tsx scripts/run-oracle-batch2-tests.ts",
+    "test:coverage": "tsx scripts/run-oracle-batch1-tests.ts && tsx scripts/run-oracle-batch2-tests.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

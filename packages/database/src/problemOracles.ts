@@ -79,13 +79,13 @@ export const BATCH1_ADDITIONAL_INPUTS: Record<Batch1Slug, string[]> = {
   ],
 };
 
-function tokenize(line: string): string[] {
+export function tokenize(line: string): string[] {
   const trimmed = line.trim();
   if (trimmed.length === 0) return [];
   return trimmed.split(/\s+/g);
 }
 
-function parseNumberTokens(line: string): number[] {
+export function parseNumberTokens(line: string): number[] {
   return tokenize(line).map((t) => Number(t));
 }
 
