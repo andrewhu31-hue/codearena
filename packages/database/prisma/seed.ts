@@ -2,6 +2,7 @@ import { PrismaClient, Role, Difficulty, Language } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { computeBatch1AdditionalTests } from "../src/problemOracles.js";
 import { computeBatch2AdditionalTests } from "../src/problemOraclesBatch2.js";
+import { computeBatch3AdditionalTests } from "../src/problemOraclesBatch3.js";
 
 const prisma = new PrismaClient();
 
@@ -254,6 +255,7 @@ function expandProblemTests(problem: SeedProblem): SeedProblem {
     ...problem.hiddenTests,
     ...computeBatch1AdditionalTests(problem.slug),
     ...computeBatch2AdditionalTests(problem.slug),
+    ...computeBatch3AdditionalTests(problem.slug),
     ...buildStressTests(problem.slug),
   ]);
 
