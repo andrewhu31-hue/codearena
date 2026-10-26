@@ -3,6 +3,8 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/andrewhu31-hue/codearena/<branch>/deploy/setup.sh | bash -s -- <branch>
 #
+# Optional: CORS_ORIGIN=https://your-site.vercel.app (before `bash`) sets the
+# website address on first run; later, edit it in /opt/codearena/.env.
 # Installs Docker, clones the repo to /opt/codearena, writes .env with fresh
 # secrets (kept on later runs), and starts API + judge + Postgres + Redis +
 # Caddy (HTTPS). Safe to re-run: it pulls the branch and rebuilds.
@@ -43,8 +45,8 @@ JWT_ACCESS_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 JWT_REFRESH_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 # Public HTTPS name for the API. <ip>.sslip.io works without buying a domain.
 API_DOMAIN=api.${ip//./-}.sslip.io
-# The website's address (Vercel). Update after deploying the web app.
-CORS_ORIGIN=https://codearena.vercel.app
+# The website's address(es), comma-separated (Vercel URL, custom domain).
+CORS_ORIGIN=${CORS_ORIGIN:-https://codearena.vercel.app}
 GENERAL_RATE_LIMIT_MAX=1000
 JUDGE_WORKER_REPLICAS=1
 WORKER_CONCURRENCY=2

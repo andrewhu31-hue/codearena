@@ -24,7 +24,7 @@ served at `https://api.<server-ip-with-dashes>.sslip.io` (no domain needed); set
 
 Then edit `/opt/codearena/.env`:
 
-- `CORS_ORIGIN` = the website's address from step 2 (e.g. `https://codearena.vercel.app`)
+- `CORS_ORIGIN` = the website's address from step 2 (e.g. `https://codearena.vercel.app`); several can be given, comma-separated
 - `ANTHROPIC_API_KEY` = your key, to enable AI hints and code review (optional)
 
 and apply with `cd /opt/codearena && docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d`.

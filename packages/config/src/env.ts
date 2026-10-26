@@ -36,7 +36,19 @@ const apiEnvSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
-  CORS_ORIGIN: z.string().min(1).default("http://localhost:3000"),
+  // One origin, or several separated by commas (e.g. the vercel.app address
+  // and a custom domain). Parsed into a list; a single origin stays a string.
+  CORS_ORIGIN: z
+    .string()
+    .min(1)
+    .default("http://localhost:3000")
+    .transform((v): string | string[] => {
+      const list = v
+        .split(",")
+        .map((o) => o.trim().replace(/\/+$/, ""))
+        .filter(Boolean);
+      return list.length === 1 ? list[0]! : list;
+    }),
   SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
   SUBMISSION_RATE_LIMIT_WINDOW_MS: z.coerce
     .number()
@@ -81,6 +93,11 @@ let cachedApiEnv: ApiEnv | undefined;
  * Fails fast with a readable message instead of letting bad config surface
  * later as a confusing runtime error.
  */
+/** Uncached parse, for tests and tooling. */
+export function parseApiEnv(source: NodeJS.ProcessEnv): ApiEnv {
+  return parseEnv(apiEnvSchema, source);
+}
+
 export function loadApiEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
   if (!cachedApiEnv) cachedApiEnv = parseEnv(apiEnvSchema, source);
   return cachedApiEnv;
