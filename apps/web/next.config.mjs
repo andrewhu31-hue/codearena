@@ -13,9 +13,14 @@ const apiProxyTarget = process.env.API_PROXY_TARGET?.trim().replace(/\/+$/, "");
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@codearena/shared"],
-  output: "standalone",
-  // Monorepo: trace file dependencies from the workspace root, not just apps/web.
-  outputFileTracingRoot: path.join(__dirname, "../../"),
+  // The standalone bundle is for the Docker image; Vercel packages the app itself.
+  ...(process.env.VERCEL
+    ? {}
+    : {
+        output: "standalone",
+        // Monorepo: trace file dependencies from the workspace root, not just apps/web.
+        outputFileTracingRoot: path.join(__dirname, "../../"),
+      }),
   async rewrites() {
     if (!apiProxyTarget) return [];
     return [{ source: "/api/v1/:path*", destination: `${apiProxyTarget}/api/v1/:path*` }];
