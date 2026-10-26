@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+/**
+ * Trims whitespace/newlines and wrapping quotes that commonly sneak in when a
+ * secret is pasted into a hosting dashboard; an empty result means "unset".
+ */
+export function cleanSecret(raw: string | undefined): string | undefined {
+  let value = (raw ?? "").trim();
+  if (
+    value.length >= 2 &&
+    value[0] === value[value.length - 1] &&
+    (value[0] === '"' || value[0] === "'")
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+  return value || undefined;
+}
+
 function parseEnv<S extends z.ZodTypeAny>(schema: S, source: NodeJS.ProcessEnv): z.infer<S> {
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
@@ -34,6 +50,23 @@ const apiEnvSchema = z.object({
     .int()
     .positive()
     .default(5 * 60 * 1000),
+  // AI study aids (hints, code review). Optional: without a key the features
+  // report themselves as unavailable and everything else works as before.
+  ANTHROPIC_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => cleanSecret(v)),
+  ANTHROPIC_MODEL: z
+    .string()
+    .optional()
+    .transform((v) => cleanSecret(v) ?? "claude-sonnet-5-5"),
+  AI_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  AI_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

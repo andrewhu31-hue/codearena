@@ -19,7 +19,7 @@ Do not fabricate benchmark results, user counts, downloads, or performance impro
 
 Build **CodeArena**, a full-stack competitive programming platform where users can register, browse problems, write and submit solutions, join timed contests, receive test results, view live rankings, and review submission history.
 
-This is not an AI application. Do not add generated hints, solutions, chatbots, or LLM APIs.
+This is not an AI application at its core. The only AI features are the bounded study aids added later (progressive no-code hints and review of already-accepted code, both disabled for problems in contests that haven't ended; see README "AI study aids"). Do not add generated solutions or chatbots.
 
 The primary engineering challenge is safely processing untrusted code asynchronously while supporting live contests and measurable performance.
 

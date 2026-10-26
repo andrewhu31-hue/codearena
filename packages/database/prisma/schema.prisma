@@ -66,6 +66,7 @@ model User {
   submissions          Submission[]
   contestRegistrations ContestRegistration[]
   contestScores        ContestScore[]
+  hintUnlocks          HintUnlock[]
 
   @@map("users")
 }
@@ -102,6 +103,8 @@ model Problem {
   testCases       TestCase[]
   submissions     Submission[]
   contestProblems ContestProblem[]
+  hints           ProblemHint[]
+  hintUnlocks     HintUnlock[]
 
   @@map("problems")
 }
@@ -195,6 +198,7 @@ model Submission {
 
   results SubmissionResult[]
   failureEvents SubmissionFailureEvent[]
+  codeReview    CodeReview?
 
   @@index([userId, createdAt])
   @@index([contestId])
@@ -254,4 +258,49 @@ model ContestScore {
   @@unique([contestId, userId])
   @@index([contestId, score])
   @@map("contest_scores")
+}
+
+// AI study aids (see packages/shared/src/ai.ts).
+//
+// ProblemHint caches one generated hint per (problem, level) for everyone:
+// hints are built from the public statement only, so they're the same for
+// every user and only paid for once. HintUnlock records which levels each
+// user has opened, so levels unlock in order and the UI can show them again.
+model ProblemHint {
+  id        String   @id @default(uuid())
+  problemId String
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  level     Int
+  content   String
+  model     String
+  createdAt DateTime @default(now())
+
+  @@unique([problemId, level])
+  @@map("problem_hints")
+}
+
+model HintUnlock {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId  String
+  problem    Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  level      Int
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, problemId, level])
+  @@index([userId, problemId])
+  @@map("hint_unlocks")
+}
+
+// One stored review per accepted submission, so asking again is free.
+model CodeReview {
+  id           String     @id @default(uuid())
+  submissionId String     @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  review       Json
+  model        String
+  createdAt    DateTime   @default(now())
+
+  @@map("code_reviews")
 }
