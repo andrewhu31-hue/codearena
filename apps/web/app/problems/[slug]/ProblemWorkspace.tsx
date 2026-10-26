@@ -15,6 +15,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useSubmissionRealtime } from "@/lib/realtime";
 import { NavBar } from "../../components/NavBar";
 import { CodeEditor } from "../../components/CodeEditor";
+import { AiHints } from "../../components/AiHints";
+import { AiReview } from "../../components/AiReview";
 
 const STARTER_TEMPLATES: Record<Language, string> = {
   PYTHON: "class Solution:\n    def solve(self, input: str):\n        pass\n",
@@ -261,6 +263,10 @@ export function ProblemWorkspace({ slug }: { slug: string }) {
                     ))}
                   </div>
                 )}
+
+                {authStatus === "authenticated" && accessToken && (
+                  <AiHints slug={slug} accessToken={accessToken} />
+                )}
               </section>
 
               <section>
@@ -349,6 +355,12 @@ export function ProblemWorkspace({ slug }: { slug: string }) {
                           <pre className="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-2 text-xs text-rose-300">
                             {submissionQuery.data.compilerOutput}
                           </pre>
+                        )}
+                        {submissionQuery.data.verdict === "ACCEPTED" && accessToken && (
+                          <AiReview
+                            submissionId={submissionQuery.data.id}
+                            accessToken={accessToken}
+                          />
                         )}
                       </>
                     )}

@@ -183,6 +183,29 @@ the pub/sub message. Every page using this treats it as an enhancement, not a de
 workspace and leaderboard pages poll over REST regardless (3s/10s), and a push just triggers an
 earlier refetch — a dropped or never-established socket degrades to "slightly slower," not broken.
 
+## AI study aids
+
+Two optional, deliberately bounded AI features (enabled by setting `ANTHROPIC_API_KEY`):
+
+- **Progressive hints** on a problem page: Nudge → Approach → Walkthrough, unlocked in order.
+  Hints never contain code (code blocks are stripped server-side) and are generated from the
+  public statement and examples only; hidden test cases are never sent to the model. Each
+  (problem, level) hint is generated once and shared by everyone, so cost doesn't grow with users.
+- **Code review** of a submission that was already **accepted**: complexity, strengths,
+  improvements and a better approach if there is one. Stored per submission, so asking again is free.
+
+Both are **off for any problem in a contest that hasn't ended** (upcoming or live), enforced by
+the API on every request; even previously unlocked hints are hidden until the contest ends.
+Calls that can reach the model are rate-limited per user (`AI_RATE_LIMIT_*`).
+
+| Method | Path                                | Description                                 |
+| ------ | ----------------------------------- | ------------------------------------------- |
+| GET    | `/api/v1/ai/status`                 | `{ enabled }`                               |
+| GET    | `/api/v1/ai/problems/:slug/hints`   | Hints the caller has unlocked + next level  |
+| POST   | `/api/v1/ai/problems/:slug/hints`   | Unlock `{ level }` (must be the next level) |
+| GET    | `/api/v1/ai/submissions/:id/review` | Stored review (404 if none yet)             |
+| POST   | `/api/v1/ai/submissions/:id/review` | Review an accepted submission you own       |
+
 ## Caching and rate limiting
 
 - `GET /problems` and `GET /problems/:slug` are cached in Redis (`PROBLEM_CACHE_TTL_SECONDS`,
@@ -274,6 +297,9 @@ See [`.env.example`](./.env.example) for the full list. Notable ones:
 | `GENERAL_RATE_LIMIT_MAX`/`_WINDOW_MS`      | Per-IP limit applied to every request                                                                   |
 | `PROBLEM_CACHE_TTL_SECONDS`                | TTL for cached public problem metadata                                                                  |
 | `WORKER_CONCURRENCY`                       | Judge worker's concurrent job count                                                                     |
+| `ANTHROPIC_API_KEY`                        | Optional. Enables AI hints and code review; without it those features are hidden                        |
+| `ANTHROPIC_MODEL`                          | Model for AI features (default `claude-sonnet-5-5`)                                                     |
+| `AI_RATE_LIMIT_MAX`/`_WINDOW_MS`           | Per-user limit on AI requests that can reach the model (default 20/hour)                                |
 
 The API and judge worker both refuse to start if a required variable is missing or invalid
 (`packages/config`).

@@ -13,13 +13,27 @@ import { createAuthRouter } from "./routes/auth.routes.js";
 import { createProblemRouter } from "./routes/problem.routes.js";
 import { createSubmissionRouter, createUserSubmissionsRouter } from "./routes/submission.routes.js";
 import { createContestRouter } from "./routes/contest.routes.js";
+import { createAiRouter } from "./routes/ai.routes.js";
+import { createAnthropicProvider, type AiProvider } from "./lib/ai.js";
 import { createGeneralRateLimiter } from "./middleware/rateLimit.js";
 import { logger } from "./lib/logger.js";
 
-export function createApp(env: ApiEnv, redis: Redis, submissionQueue: Queue): Express {
+export interface AppDeps {
+  /** Override the AI provider (tests pass a fake; null disables AI features). */
+  aiProvider?: AiProvider | null;
+}
+
+export function createApp(
+  env: ApiEnv,
+  redis: Redis,
+  submissionQueue: Queue,
+  deps: AppDeps = {},
+): Express {
   const app = express();
+  const aiProvider = deps.aiProvider !== undefined ? deps.aiProvider : createAnthropicProvider(env);
 
   app.disable("x-powered-by");
+  if (env.TRUST_PROXY > 0) app.set("trust proxy", env.TRUST_PROXY);
   app.use(requestId);
   app.use(
     pinoHttp({
@@ -76,6 +90,7 @@ export function createApp(env: ApiEnv, redis: Redis, submissionQueue: Queue): Ex
   app.use("/api/v1/submissions", createSubmissionRouter(env, redis, submissionQueue));
   app.use("/api/v1/users", createUserSubmissionsRouter(env, submissionQueue));
   app.use("/api/v1/contests", createContestRouter(env, redis));
+  app.use("/api/v1/ai", createAiRouter(env, redis, aiProvider));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

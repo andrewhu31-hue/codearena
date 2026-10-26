@@ -32,4 +32,8 @@ export class AppError extends Error {
   static conflict(message: string): AppError {
     return new AppError(409, ERROR_CODES.CONFLICT, message);
   }
+
+  static aiUnavailable(message = "AI features aren't available on this server"): AppError {
+    return new AppError(503, ERROR_CODES.AI_UNAVAILABLE, message);
+  }
 }

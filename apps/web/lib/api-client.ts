@@ -1,5 +1,9 @@
 import type {
+  AiStatusResponse,
   ApiErrorBody,
+  CodeReviewResponse,
+  HintLevel,
+  ProblemHintsResponse,
   AuthResponse,
   ContestDetail,
   ContestSummary,
@@ -14,7 +18,11 @@ import type {
   SubmissionSummary,
 } from "@codearena/shared";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Unset in a production build means "same origin": requests go to /api/v1/*
+// on the site itself, proxied to the API (see API_PROXY_TARGET in next.config).
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000");
 
 export class ApiRequestError extends Error {
   readonly code: string;
@@ -114,4 +122,31 @@ export const contestsApi = {
 
   getLeaderboard: (id: string) =>
     request<LeaderboardResponse>(`/api/v1/contests/${id}/leaderboard`),
+};
+
+export const aiApi = {
+  status: () => request<AiStatusResponse>("/api/v1/ai/status"),
+
+  getHints: (accessToken: string, slug: string) =>
+    request<ProblemHintsResponse>(`/api/v1/ai/problems/${encodeURIComponent(slug)}/hints`, {
+      headers: authHeaders(accessToken),
+    }),
+
+  unlockHint: (accessToken: string, slug: string, level: HintLevel) =>
+    request<ProblemHintsResponse>(`/api/v1/ai/problems/${encodeURIComponent(slug)}/hints`, {
+      method: "POST",
+      headers: authHeaders(accessToken),
+      body: JSON.stringify({ level }),
+    }),
+
+  getReview: (accessToken: string, submissionId: string) =>
+    request<CodeReviewResponse>(`/api/v1/ai/submissions/${submissionId}/review`, {
+      headers: authHeaders(accessToken),
+    }),
+
+  createReview: (accessToken: string, submissionId: string) =>
+    request<CodeReviewResponse>(`/api/v1/ai/submissions/${submissionId}/review`, {
+      method: "POST",
+      headers: authHeaders(accessToken),
+    }),
 };

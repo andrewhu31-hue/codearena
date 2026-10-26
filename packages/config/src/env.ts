@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+/**
+ * Trims whitespace/newlines and wrapping quotes that commonly sneak in when a
+ * secret is pasted into a hosting dashboard; an empty result means "unset".
+ */
+export function cleanSecret(raw: string | undefined): string | undefined {
+  let value = (raw ?? "").trim();
+  if (
+    value.length >= 2 &&
+    value[0] === value[value.length - 1] &&
+    (value[0] === '"' || value[0] === "'")
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+  return value || undefined;
+}
+
 function parseEnv<S extends z.ZodTypeAny>(schema: S, source: NodeJS.ProcessEnv): z.infer<S> {
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
@@ -20,7 +36,19 @@ const apiEnvSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
-  CORS_ORIGIN: z.string().min(1).default("http://localhost:3000"),
+  // One origin, or several separated by commas (e.g. the vercel.app address
+  // and a custom domain). Parsed into a list; a single origin stays a string.
+  CORS_ORIGIN: z
+    .string()
+    .min(1)
+    .default("http://localhost:3000")
+    .transform((v): string | string[] => {
+      const list = v
+        .split(",")
+        .map((o) => o.trim().replace(/\/+$/, ""))
+        .filter(Boolean);
+      return list.length === 1 ? list[0]! : list;
+    }),
   SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
   SUBMISSION_RATE_LIMIT_WINDOW_MS: z.coerce
     .number()
@@ -34,6 +62,26 @@ const apiEnvSchema = z.object({
     .int()
     .positive()
     .default(5 * 60 * 1000),
+  // AI study aids (hints, code review). Optional: without a key the features
+  // report themselves as unavailable and everything else works as before.
+  ANTHROPIC_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => cleanSecret(v)),
+  ANTHROPIC_MODEL: z
+    .string()
+    .optional()
+    .transform((v) => cleanSecret(v) ?? "claude-sonnet-5-5"),
+  AI_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  AI_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
+  // Number of reverse proxies in front of the API (e.g. 1 behind Caddy).
+  // Needed so per-IP rate limits see the client's IP, not the proxy's.
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;
@@ -45,6 +93,11 @@ let cachedApiEnv: ApiEnv | undefined;
  * Fails fast with a readable message instead of letting bad config surface
  * later as a confusing runtime error.
  */
+/** Uncached parse, for tests and tooling. */
+export function parseApiEnv(source: NodeJS.ProcessEnv): ApiEnv {
+  return parseEnv(apiEnvSchema, source);
+}
+
 export function loadApiEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
   if (!cachedApiEnv) cachedApiEnv = parseEnv(apiEnvSchema, source);
   return cachedApiEnv;
