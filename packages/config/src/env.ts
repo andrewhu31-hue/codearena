@@ -67,6 +67,9 @@ const apiEnvSchema = z.object({
     .positive()
     .default(60 * 60 * 1000),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
+  // Number of reverse proxies in front of the API (e.g. 1 behind Caddy).
+  // Needed so per-IP rate limits see the client's IP, not the proxy's.
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

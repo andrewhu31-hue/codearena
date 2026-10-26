@@ -1,0 +1,49 @@
+# Production overrides for a single Docker host running the API, judge
+# workers, Postgres and Redis (the website runs on Vercel; see deploy/README.md).
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+#
+# Run from the repository root (the judge worker needs $PWD = repo root).
+services:
+  postgres:
+    ports: !reset [] # not reachable from the internet
+
+  redis:
+    ports: !reset []
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+  api:
+    ports: !reset [] # only Caddy talks to it
+    environment:
+      TRUST_PROXY: ${TRUST_PROXY:-2} # Vercel proxy + Caddy
+
+  judge-worker:
+    deploy:
+      replicas: ${JUDGE_WORKER_REPLICAS:-1}
+
+  # The website is served by Vercel; enable this only to self-host it too.
+  web:
+    profiles: ["self-hosted-web"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

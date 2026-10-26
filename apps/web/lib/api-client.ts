@@ -18,7 +18,11 @@ import type {
   SubmissionSummary,
 } from "@codearena/shared";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Unset in a production build means "same origin": requests go to /api/v1/*
+// on the site itself, proxied to the API (see API_PROXY_TARGET in next.config).
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000");
 
 export class ApiRequestError extends Error {
   readonly code: string;

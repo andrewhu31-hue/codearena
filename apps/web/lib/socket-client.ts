@@ -1,6 +1,10 @@
 import { io, type Socket } from "socket.io-client";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Socket.IO connects to the API directly (WebSockets can't go through the
+// same-origin REST proxy). It authenticates with the access token, not the
+// refresh cookie, so cross-origin is fine here.
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 let socket: Socket | null = null;
 let socketToken: string | null = null;
